@@ -3,6 +3,9 @@
 	Client*
 	MyOwnBrowser
 */
+// GET http://localhost/file.html
+// PUT http://localhost/ file.html
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -18,12 +21,14 @@
 void handleGETRequest(char message[], char filename[], int socket_desc)
 {
 
-	char receive_msg[100010] = {0};
+	char receive_msg[100010] = {'\0'};
+
 	if (send(socket_desc, message, strlen(message), 0) < 0)
 	{
 		puts("Send failed");
 		exit(1);
 	}
+
 	remove(filename);
 	FILE *f = fopen(filename, "ab");
 	if (f == NULL)
@@ -35,6 +40,8 @@ void handleGETRequest(char message[], char filename[], int socket_desc)
 	int count = 0;
 	if ((count = recv(socket_desc, receive_msg, 100000, 0)) > 0)
 	{
+		printf("value of count is %d\n", count);	
+		printf("receive msg is %s\n", receive_msg);
 		if (receive_msg[9] != '2' || receive_msg[10] != '0' || receive_msg[11] != '0')
 		{
 			printf("Didn't get a 200 OK response. Following is header received. Exiting ...\n\n");
@@ -44,17 +51,37 @@ void handleGETRequest(char message[], char filename[], int socket_desc)
 		}
 
 		int i = 4;
-		while (receive_msg[i - 4] != '\r' || receive_msg[i - 3] != '\n' || receive_msg[i - 2] != '\r' || receive_msg[i - 1] != '\n')
+		while ((receive_msg[i - 4] != '\r' || receive_msg[i - 3] != '\n' || receive_msg[i - 2] != '\r' || receive_msg[i - 1] != '\n') && i < count)
 			i++;
 
-		fwrite(receive_msg + i, count - i, 1, f);
-		receive_msg[i] = '\0';
+		// printf("value of i is %d\n", i);
+		// fwrite(receive_msg + i, count - i, 1, f);
+		// write into file character by character
+		// printf("behen\n");
+		// printf("receive msg is %s\n", receive_msg);
+		if(count-i>0)
+		{	for (int j = i; j < count; j++)
+			{
+				printf("%c", receive_msg[j]);
+				fwrite(receive_msg[j], 1, 1, f);
+			}
+		}
 		printf("HTTP response header:\n\n%s", receive_msg);
 	}
-
+	count=0;
 	while ((count = recv(socket_desc, receive_msg, 100000, 0)) > 0)
 	{
-		fwrite(receive_msg, count, 1, f);
+		// printf("bhaii\n");
+		// printf("value of count is %d\n", count);
+		// printf("receive msg is %s\n", receive_msg);
+		// fwrite(receive_msg, count, 1, f);
+		for(int i=0;i<count;i++)
+		{
+			// write into file using fprintf
+			fprintf(f, "%c", receive_msg[i]);
+			// printf("%c", receive_msg[i]);
+			// fwrite(receive_msg[i], 1, 1, f);
+		}
 	}
 
 	printf("Reply received.\n");
@@ -64,30 +91,7 @@ void handleGETRequest(char message[], char filename[], int socket_desc)
 	printf("\n\nFile's Information:\n");
 	printf("Name: %s\n", name);
 	printf("Extension: %s\n", extension);
-	if (strcmp(extension, "pdf")==0)
-	{
-		char command[500];
-		sprintf(command, "acroread %s.%s", name, extension);
-		system(command);
-	}
-	if (strcmp(extension, "html")==0)
-	{
-		char command[500];
-		sprintf(command, "google-chrome %s.%s", name, extension);
-		system(command);
-	}
-		if (strcmp(extension, "jpeg")==0)
-	{
-		char command[500];
-		sprintf(command, "xdg-open %s.%s", name, extension);
-		system(command);
-	}
-	if (strcmp(extension, "txt")==0)
-	{
-		char command[500];
-		sprintf(command, "gedit %s.%s", name, extension);
-		system(command);
-	}
+	// if ()
 	fclose(f);
 }
 
@@ -218,13 +222,15 @@ int main(void)
 				filename[j - 1] = urlname[i - count + j];
 			filename[count] = '\0';
 
-			char message[4096];
-
+			// char message[4096];
+			char* message[300];
 			sprintf(message, "GET %s%s%s%s", path, " HTTP/1.1\r\nHost: ", host, "\r\nConnection: Close\r\n\r\n");
-			// sprintf(message, "GET %s%s%s%s", path, " HTTP/1.1\nHost: ", host, "\nConnection: Close\n\n");
+			// sprintf(message, "PUT %s HTTP/%s\r\nHost: %s\r\nConnection: close\r\nAccept-Language: en-us\r\nContent-language: en-us\r\nContent-length: %d\r\nContent-type: %s\r\n", filename, "1.1", host, total_bytes, "plain/text");
+			// printf("[%s]\n", recv1);
+			
 			struct sockaddr_in server = {0};
 
-			int socket_desc, port = (urlname[4] == 's' ? 443 : 80);
+			int socket_desc, port = (urlname[4] == 's' ? 443 : 8080);
 
 			if ((socket_desc = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 			{
@@ -247,7 +253,7 @@ int main(void)
 				return 1;
 			}
 			printf("Sucessfully conected with server\n");
-			if (urlname[4] == 's')
+			if(urlname[4]=='s')
 			{
 				handleGETRequestSecured(message, filename, socket_desc);
 			}
@@ -266,28 +272,22 @@ int main(void)
 		{
 			// fprintf(stdout,"2\n");
 			size_t sz1 = 100;
-			char *url = (char *)malloc(sz1 * sizeof(char));
-			url = strtok(NULL, " ");
-			int count = 0,
-				i = (url[4] == 's' ? 8 : 7);
-			for (; url[i + count] != '/'; count++)
-				;
-			char host[count + 1], path[strlen(url) - i - count + 10];
-			for (int j = 0; j < count; j++)
-				host[j] = url[i + j];
-			host[count] = '\0';
-			i += count, count = 0;
-			for (int j = 0; url[i + count]; count++, j++)
-				path[j] = url[i + count];
-			path[count] = '\0';
-			count = 0;
-			i = strlen(url) - 1;
-
-			for (; url[i - count] != '/'; count++)
-				;
+			char *urlname = (char *)malloc(sz1 * sizeof(char));
+			urlname = strtok(NULL, " ");
 			char *filename = (char *)malloc(sz1 * sizeof(char));
 			filename = strtok(NULL, " ");
-			printf("[%s] [%s]\n", url, filename);
+			int count = 0,
+				i = (urlname[4] == 's' ? 8 : 7);
+			for (; urlname[i + count] != '/'; count++)
+				;
+			char host[count + 1], path[strlen(urlname) - i - count + 10];
+			for (int j = 0; j < count; j++)
+				host[j] = urlname[i + j];
+			host[count] = '\0';
+			i += count, count = 0;
+			for (int j = 0; urlname[i + count]; count++, j++)
+				path[j] = urlname[i + count];
+			path[count] = '\0';
 			int sockfd, ret;
 			struct sockaddr_in server_addr;
 			char buffer[BUFSIZE];
@@ -300,11 +300,20 @@ int main(void)
 			}
 			printf("[+]Client Socket is created.\n");
 
-			memset(&server_addr, 0, sizeof(server_addr));
+			struct hostent *hostent = gethostbyname(host);
+			if (hostent == NULL)
+			{
+				printf("No such url exist. No such host. Exiting...!\n");
+				return 1;
+			}
+			// printf("[%s]\n", hostent->h_a)
+			memcpy(&server_addr.sin_addr.s_addr, hostent->h_addr, hostent->h_length);
+
+			// memset(&server_addr, 0, sizeof(server_addr));
 
 			server_addr.sin_family = AF_INET;
 			server_addr.sin_port = htons(PORT);
-			server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+			// server_addr.sin_addr.s_addr = inet_addr(host);
 
 			ret = connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 			if (ret < 0)
@@ -313,28 +322,32 @@ int main(void)
 				exit(1);
 			}
 			printf("[+]Connected to the server.\n");
+			
+			FILE* fp = fopen(filename, "rb");
+			fseek(fp, 0L, SEEK_END);
+			int total_bytes = ftell(fp);
+			close(fp);
 			pdf_file = fopen(filename, "rb");
 			if (pdf_file == NULL)
 			{
 				perror("[-]Error in opening file");
 				exit(1);
 			}
-			char* recq1 = (char *)malloc(300);
-			// sprintf(request, "PUT /%s/%s.%s %s\nHost: %s\nConnection: close\nDate: %s\nAccept: %s\nAccept-Language: en-us\nIf-Modified-Since: %s\nContent-language: en-us\nContent-length: %d\nContent-type: %s\n", path, filename, extension, version, host, date, accept_type, date2, sizeof(request), accept_type);
-			sprintf(recq1, "PUT /%s/%s.%s %s\nHost: %s\nConnection: close\nDate: %s\nAccept: %s\nAccept-Language: en-us\nIf-Modified-Since: %s\nContent-language: en-us\nContent-length: %d\nContent-type: %s\n", path, filename, "1", "2", host, "3", "4", "5", sizeof(request), "6");
-			send(sockfd, recq1, 300, 0);
-			send(sockfd, filename, 100, 0);
-
+			char* recv1[300];
+			sprintf(recv1, "PUT %s HTTP/%s\r\nHost: %s\r\nConnection: close\r\nAccept-Language: en-us\r\nContent-language: en-us\r\nContent-length: %d\r\nContent-type: %s\r\n", filename, "1.1", host, total_bytes, "plain/text");
+			send(sockfd, recv1, 300, 0);
+			
+			// send(sockfd, filename, 100, 0);
 			while ((ret = fread(buffer, 1, BUFSIZE, pdf_file)) > 0)
+			{
+				// printf("[%s]", buffer);
 				send(sockfd, buffer, ret, 0);
+			}
 			fprintf(stdout, "PUT's Response:\n");
-			// memset(buffer, '\0', BUFSIZE);
-			// while ((ret = recv(sockfd, buffer, BUFSIZE, 0)) > 0)
-			// // {
-			// 	char buf[10000];
-			// 	recv(sockfd, buf, 10000, 0);
-			// 	fprintf(stdout, "%s", buf);
-			// }
+			char buf[1000];
+			memset(buf, '\0', 1000);
+			recv(sockfd, buf, 1000, 0);
+			fprintf(stdout, "%s", buf);
 			close(sockfd);
 			fclose(pdf_file);
 			continue;
