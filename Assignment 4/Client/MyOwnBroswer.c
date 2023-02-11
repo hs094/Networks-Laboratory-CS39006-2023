@@ -1,4 +1,8 @@
-// gcc -Wall -o f file.c -L/usr/lib -lssl -lcrypto
+// gcc -Wall -o cli MyOwnBroswer.c -L/usr/lib -lssl -lcrypto
+/*
+	Client*
+	MyOwnBrowser
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -6,8 +10,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
-// #include<openssl/ssl.h>
-// #include<openssl/err.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#define PORT 8080
+#define BUFSIZE 1024
 
 void handleGETRequest(char message[], char filename[], int socket_desc)
 {
@@ -60,88 +66,82 @@ void handleGETRequest(char message[], char filename[], int socket_desc)
 	printf("\n\nFile's Information:\n");
 	printf("Name: %s\n", name);
 	printf("Extension: %s\n", extension);
-	if()
+	// if ()
 	fclose(f);
 }
 
-// void newHTTPS(char message[], char filename[], int socket_desc){
-// 	printf("2\n");
-// 	SSL* ssl;
-// 	SSL_CTX* ctx;
+void handleGETRequestSecured(char message[], char filename[], int socket_desc){
+	printf("2\n");
+	SSL* ssl;
+	SSL_CTX* ctx;
 
-// 	char receive_msg[100010] = {0};
+	char receive_msg[100010] = {0};
 
-// 	SSL_load_error_strings();
-//     SSL_library_init();
-//     OpenSSL_add_all_algorithms();
+	SSL_load_error_strings();
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
 
-// 	ctx = SSL_CTX_new(SSLv23_client_method());
-// 	if (ctx == NULL){
-// 		printf("CTX is null.\n");
-// 		exit(1);
-// 	}
-// 	ssl = SSL_new(ctx);
-// 	if(!ssl){
-// 		printf("Error creating SSL.\n");
-// 		exit(1);
-// 	}
+	ctx = SSL_CTX_new(SSLv23_client_method());
+	if (ctx == NULL){
+		printf("CTX is null.\n");
+		exit(1);
+	}
+	ssl = SSL_new(ctx);
+	if(!ssl){
+		printf("Error creating SSL.\n");
+		exit(1);
+	}
 
-// 	SSL_set_fd(ssl, socket_desc);
+	SSL_set_fd(ssl, socket_desc);
 
-// 	if(SSL_connect(ssl) <= 0){
-// 		printf("Error while creating SSL connection.\n");
-// 		exit(1);
-// 	}
-// 	printf("SSL connected.\n");
+	if(SSL_connect(ssl) <= 0){
+		printf("Error while creating SSL connection.\n");
+		exit(1);
+	}
+	printf("SSL connected.\n");
 
-// 	if(SSL_write(ssl, message, strlen(message)) <= 0){
-// 		puts("Send failed");
-// 		exit(1);
-// 	}
+	if(SSL_write(ssl, message, strlen(message)) <= 0){
+		puts("Send failed");
+		exit(1);
+	}
 
-// 	remove(filename);
-// 	FILE *f = fopen(filename, "ab");
-// 	if(f == NULL){
-// 		printf("Error while opening file.\n");
-// 		exit(1);
-// 	}
+	remove(filename);
+	FILE *f = fopen(filename, "ab");
+	if(f == NULL){
+		printf("Error while opening file.\n");
+		exit(1);
+	}
 
-// 	int count = 0;
-// 	if((count = SSL_read(ssl, receive_msg, 100000)) > 0){
-// 		if(receive_msg[9] != '2' || receive_msg[10] != '0' || receive_msg[11] != '0'){
-// 			printf("Didn't get a 200 OK response. Following is header received. Exiting ...\n\n");
-// 			printf("%s", receive_msg);
-// 			remove(filename);
-// 			exit(1);
-// 		}
-// 		int i = 4;
-// 		while(receive_msg[i-4] != '\r' || receive_msg[i-3] != '\n' || receive_msg[i-2] != '\r' || receive_msg[i-1] != '\n')
-// 			i++;
+	int count = 0;
+	if((count = SSL_read(ssl, receive_msg, 100000)) > 0){
+		if(receive_msg[9] != '2' || receive_msg[10] != '0' || receive_msg[11] != '0'){
+			printf("Didn't get a 200 OK response. Following is header received. Exiting ...\n\n");
+			printf("%s", receive_msg);
+			remove(filename);
+			exit(1);
+		}
+		int i = 4;
+		while(receive_msg[i-4] != '\r' || receive_msg[i-3] != '\n' || receive_msg[i-2] != '\r' || receive_msg[i-1] != '\n')
+			i++;
 
-// 		fwrite(receive_msg+i , count-i , 1, f);
-// 		receive_msg[i] = '\0';
-// 		printf("HTTP response header:\n\n%s", receive_msg);
-// 	}
+		fwrite(receive_msg+i , count-i , 1, f);
+		receive_msg[i] = '\0';
+		printf("HTTP response header:\n\n%s", receive_msg);
+	}
 
-// 	while((count = SSL_read(ssl, receive_msg, 100000)) > 0){
-// 		fwrite(receive_msg , count , 1, f);
-// 	}
+	while((count = SSL_read(ssl, receive_msg, 100000)) > 0){
+		fwrite(receive_msg , count , 1, f);
+	}
 
-// 	printf("Reply received.\n");
-// 	fclose(f);
-//     SSL_CTX_free(ctx);
-// }
+	printf("Reply received.\n");
+	fclose(f);
+    SSL_CTX_free(ctx);
+}
 
 // gcc -Wall -o client client.c -L/usr/lib -lssl -lcrypto
 
 int main(void)
 {
-	// if(argc != 2)
-	// {
-	// 	printf("Command line argument not proper!!!\n");
-	// 	return 0;
-	// }
-	// Got the URL name
 	char *prompt = "MyOwnBroswer> ";
 	size_t sz = 1000;
 	char *ans = (char *)malloc(sz * sizeof(char));
@@ -217,12 +217,11 @@ int main(void)
 				return 1;
 			}
 			printf("Sucessfully conected with server\n");
-
-			// if(urlname[4]=='s')
-			// {
-			// 	newHTTPS(message, filename, socket_desc);
-			// }
-			// else
+			if(urlname[4]=='s')
+			{
+				handleGETRequestSecured(message, filename, socket_desc);
+			}
+			else
 			{
 				handleGETRequest(message, filename, socket_desc);
 			}
@@ -236,7 +235,46 @@ int main(void)
 		else if (cnt == 2 && (strcmp(request, "PUT") == 0 || strcmp(request, "put") == 0))
 		{
 			// fprintf(stdout,"2\n");
+			char *url = strtok(NULL, " ");
+			char *filename = strtok(NULL,  " ");
+			printf("[%s] [%s]\n", url, filename);
+			int sockfd, ret;
+			struct sockaddr_in server_addr;
+			char buffer[BUFSIZE];
+			FILE *pdf_file;
+			sockfd = socket(AF_INET, SOCK_STREAM, 0);
+			if (sockfd < 0)
+			{
+				perror("[-]Error in socket creation");
+				exit(1);
+			}
+			printf("[+]Client Socket is created.\n");
 
+			memset(&server_addr, 0, sizeof(server_addr));
+
+			server_addr.sin_family = AF_INET;
+			server_addr.sin_port = htons(PORT);
+			server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+			ret = connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+			if (ret < 0)
+			{
+				perror("[-]Error in connect");
+				exit(1);
+			}
+			printf("[+]Connected to the server.\n");
+			size_t sz1 = 100;
+			pdf_file = fopen(filename, "rb");
+			if (pdf_file == NULL)
+			{
+				perror("[-]Error in opening file");
+				exit(1);
+			}
+			send(sockfd, filename, strlen(filename), 0);
+			while ((ret = fread(buffer, 1, BUFSIZE, pdf_file)) > 0)
+				send(sockfd, buffer, ret, 0);
+			close(sockfd);
+			fclose(pdf_file);
 			continue;
 		}
 		else if (cnt == 0 && (strcmp(request, "QUIT") == 0 || strcmp(request, "quit") == 0))
