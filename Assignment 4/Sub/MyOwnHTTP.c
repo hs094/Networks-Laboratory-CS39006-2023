@@ -6,7 +6,6 @@ In this program we illustrate the use of Berkeley sockets for interprocess
 communication across the network. We show the communication between a server
 process and a client process.
 
-
 */
 
 #include <stdio.h>
@@ -18,7 +17,7 @@ process and a client process.
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-			/* THE SERVER PROCESS */
+		/* THE SERVER PROCESS */
 
 int main()
 {
@@ -55,8 +54,7 @@ int main()
 	/* With the information provided in serv_addr, we associate the server
 	   with its port using the bind() system call. 
 	*/
-	if (bind(sockfd, (struct sockaddr *) &serv_addr,
-					sizeof(serv_addr)) < 0) {
+	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
 		printf("Unable to bind local address\n");
 		exit(0);
 	}
@@ -87,7 +85,7 @@ int main()
 		   system call is stored in "newsockfd".
 		*/
 		clilen = sizeof(cli_addr);
-		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen) ;
+		newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, (socklen_t *) &clilen) ;
 
 		if (newsockfd < 0) {
 			printf("Accept error\n");
@@ -129,5 +127,3 @@ int main()
 	}
 	return 0;
 }
-			
-
