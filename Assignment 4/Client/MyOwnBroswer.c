@@ -64,7 +64,30 @@ void handleGETRequest(char message[], char filename[], int socket_desc)
 	printf("\n\nFile's Information:\n");
 	printf("Name: %s\n", name);
 	printf("Extension: %s\n", extension);
-	// if ()
+	if (strcmp(extension, "pdf")==0)
+	{
+		char command[500];
+		sprintf(command, "acroread %s.%s", name, extension);
+		system(command);
+	}
+	if (strcmp(extension, "html")==0)
+	{
+		char command[500];
+		sprintf(command, "google-chrome %s.%s", name, extension);
+		system(command);
+	}
+		if (strcmp(extension, "jpeg")==0)
+	{
+		char command[500];
+		sprintf(command, "xdg-open %s.%s", name, extension);
+		system(command);
+	}
+	if (strcmp(extension, "txt")==0)
+	{
+		char command[500];
+		sprintf(command, "gedit %s.%s", name, extension);
+		system(command);
+	}
 	fclose(f);
 }
 
