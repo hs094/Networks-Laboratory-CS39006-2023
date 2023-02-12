@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -56,24 +57,40 @@ int main(int argc, char *argv[]) {
     printf("[+]Accepted connection from client.\n");
 
     /* Open the PDF file in binary mode */
-    char filename[100];
-    memset(filename, '\0', 100);
-    recv(new_socket, filename, 100, 0);
+    char file[100];
+    memset(file, '\0', 100);
+    recv(new_socket, file, 100, 0);
+    char filename[100] = {0};
+    strcpy(filename,file);
+    char* token = strtok(file,".");
+    char* extension = strtok(NULL, ".");
     pdf_file = fopen(filename, "wb");
     if (pdf_file == NULL) 
     {
         perror("[-]Error in opening file");
         exit(1);
     }
-    
+    size_t total_bytes = 0;
     /* Receive the PDF file and write it to disk */
-    while ((ret = recv(new_socket, buffer, BUFSIZE, 0)) > 0) {
+    while ((ret = recv(new_socket, buffer, BUFSIZE, 0)) > 0) 
+    {
         fwrite(buffer, 1, ret, pdf_file);
+        total_bytes += ret;
     }
-
     /* Close the socket and the file */
+    char* response = (char *)malloc(10000*sizeof(char));
+    char* result = (char *)malloc(10*sizeof(char));
+    strcat(response, "HTTP/1.1 200 OK\r\n");
+    send(new_socket, "Hello", 6, 0);
+    // strcat(response, "Content-Length: ");
+    // sprintf(result, "%d\r\n", total_bytes);
+    // strcat(response, result);
+    // strcat(response, "Content-Type: application/");
+    // strcat(response, extension);
+    // strcat(response, "\r\n");
+    // printf("%s", response);
+    // send(new_socket, response, strlen(response)+1, 0);
     close(new_socket);
     fclose(pdf_file);
-
     return 0;
 }

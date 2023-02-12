@@ -19,13 +19,11 @@ void handleGETRequest(char message[], char filename[], int socket_desc)
 {
 
 	char receive_msg[100010] = {0};
-
 	if (send(socket_desc, message, strlen(message), 0) < 0)
 	{
 		puts("Send failed");
 		exit(1);
 	}
-
 	remove(filename);
 	FILE *f = fopen(filename, "ab");
 	if (f == NULL)
@@ -70,72 +68,81 @@ void handleGETRequest(char message[], char filename[], int socket_desc)
 	fclose(f);
 }
 
-void handleGETRequestSecured(char message[], char filename[], int socket_desc){
+void handleGETRequestSecured(char message[], char filename[], int socket_desc)
+{
 	printf("2\n");
-	SSL* ssl;
-	SSL_CTX* ctx;
+	SSL *ssl;
+	SSL_CTX *ctx;
 
 	char receive_msg[100010] = {0};
 
 	SSL_load_error_strings();
-    SSL_library_init();
-    OpenSSL_add_all_algorithms();
+	SSL_library_init();
+	OpenSSL_add_all_algorithms();
 
 	ctx = SSL_CTX_new(SSLv23_client_method());
-	if (ctx == NULL){
+	if (ctx == NULL)
+	{
 		printf("CTX is null.\n");
 		exit(1);
 	}
 	ssl = SSL_new(ctx);
-	if(!ssl){
+	if (!ssl)
+	{
 		printf("Error creating SSL.\n");
 		exit(1);
 	}
 
 	SSL_set_fd(ssl, socket_desc);
 
-	if(SSL_connect(ssl) <= 0){
+	if (SSL_connect(ssl) <= 0)
+	{
 		printf("Error while creating SSL connection.\n");
 		exit(1);
 	}
 	printf("SSL connected.\n");
 
-	if(SSL_write(ssl, message, strlen(message)) <= 0){
+	if (SSL_write(ssl, message, strlen(message)) <= 0)
+	{
 		puts("Send failed");
 		exit(1);
 	}
 
 	remove(filename);
 	FILE *f = fopen(filename, "ab");
-	if(f == NULL){
+	if (f == NULL)
+	{
 		printf("Error while opening file.\n");
 		exit(1);
 	}
 
 	int count = 0;
-	if((count = SSL_read(ssl, receive_msg, 100000)) > 0){
-		if(receive_msg[9] != '2' || receive_msg[10] != '0' || receive_msg[11] != '0'){
+	if ((count = SSL_read(ssl, receive_msg, 100000)) > 0)
+	{
+		if (receive_msg[9] != '2' || receive_msg[10] != '0' || receive_msg[11] != '0')
+		{
 			printf("Didn't get a 200 OK response. Following is header received. Exiting ...\n\n");
 			printf("%s", receive_msg);
 			remove(filename);
 			exit(1);
 		}
 		int i = 4;
-		while(receive_msg[i-4] != '\r' || receive_msg[i-3] != '\n' || receive_msg[i-2] != '\r' || receive_msg[i-1] != '\n')
+		while (receive_msg[i - 4] != '\r' || receive_msg[i - 3] != '\n' || receive_msg[i - 2] != '\r' || receive_msg[i - 1] != '\n')
 			i++;
 
-		fwrite(receive_msg+i , count-i , 1, f);
+		fwrite(receive_msg + i, count - i, 1, f);
 		receive_msg[i] = '\0';
 		printf("HTTP response header:\n\n%s", receive_msg);
 	}
 
-	while((count = SSL_read(ssl, receive_msg, 100000)) > 0){
-		fwrite(receive_msg , count , 1, f);
+	while ((count = SSL_read(ssl, receive_msg, 100000)) > 0)
+	{
+		fwrite(receive_msg, count, 1, f);
 	}
 
 	printf("Reply received.\n");
 	fclose(f);
-    SSL_CTX_free(ctx);
+	SSL_CTX_free(ctx);
 }
 
 // gcc -Wall -o client client.c -L/usr/lib -lssl -lcrypto
@@ -191,7 +198,7 @@ int main(void)
 			char message[4096];
 
 			sprintf(message, "GET %s%s%s%s", path, " HTTP/1.1\r\nHost: ", host, "\r\nConnection: Close\r\n\r\n");
-
+			// sprintf(message, "GET %s%s%s%s", path, " HTTP/1.1\nHost: ", host, "\nConnection: Close\n\n");
 			struct sockaddr_in server = {0};
 
 			int socket_desc, port = (urlname[4] == 's' ? 443 : 80);
@@ -217,7 +224,7 @@ int main(void)
 				return 1;
 			}
 			printf("Sucessfully conected with server\n");
-			if(urlname[4]=='s')
+			if (urlname[4] == 's')
 			{
 				handleGETRequestSecured(message, filename, socket_desc);
 			}
@@ -235,8 +242,12 @@ int main(void)
 		else if (cnt == 2 && (strcmp(request, "PUT") == 0 || strcmp(request, "put") == 0))
 		{
 			// fprintf(stdout,"2\n");
-			char *url = strtok(NULL, " ");
-			char *filename = strtok(NULL,  " ");
+			size_t sz1 = 100;
+
+			char *url = (char *)malloc(sz1 * sizeof(char));
+			url = strtok(NULL, " ");
+			char *filename = (char *)malloc(sz1 * sizeof(char));
+			filename = strtok(NULL, " ");
 			printf("[%s] [%s]\n", url, filename);
 			int sockfd, ret;
 			struct sockaddr_in server_addr;
@@ -263,16 +274,23 @@ int main(void)
 				exit(1);
 			}
 			printf("[+]Connected to the server.\n");
-			size_t sz1 = 100;
 			pdf_file = fopen(filename, "rb");
 			if (pdf_file == NULL)
 			{
 				perror("[-]Error in opening file");
 				exit(1);
 			}
-			send(sockfd, filename, strlen(filename), 0);
+			send(sockfd, filename, 100, 0);
 			while ((ret = fread(buffer, 1, BUFSIZE, pdf_file)) > 0)
 				send(sockfd, buffer, ret, 0);
+			fprintf(stdout, "PUT's Response:\n");
+			// memset(buffer, '\0', BUFSIZE);
+			// while ((ret = recv(sockfd, buffer, BUFSIZE, 0)) > 0)
+			// {
+				char buf[10000];
+				recv(sockfd, buf, 10000, 0);
+				fprintf(stdout, "%s", buf);
+			// }
 			close(sockfd);
 			fclose(pdf_file);
 			continue;
