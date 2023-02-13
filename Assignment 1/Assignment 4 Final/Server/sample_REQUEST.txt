@@ -1,0 +1,12 @@
+PUT /echo/put/json HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+Content-Length: 85
+Host: reqbin.com
+
+{
+"Id": 12345,
+"Customer": "John Smith",
+"Quantity": 1,
+"Price": 10.00
+}
