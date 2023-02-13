@@ -266,9 +266,25 @@ int main(void)
 		{
 			// fprintf(stdout,"2\n");
 			size_t sz1 = 100;
-
 			char *url = (char *)malloc(sz1 * sizeof(char));
 			url = strtok(NULL, " ");
+			int count = 0,
+				i = (url[4] == 's' ? 8 : 7);
+			for (; url[i + count] != '/'; count++)
+				;
+			char host[count + 1], path[strlen(url) - i - count + 10];
+			for (int j = 0; j < count; j++)
+				host[j] = url[i + j];
+			host[count] = '\0';
+			i += count, count = 0;
+			for (int j = 0; url[i + count]; count++, j++)
+				path[j] = url[i + count];
+			path[count] = '\0';
+			count = 0;
+			i = strlen(url) - 1;
+
+			for (; url[i - count] != '/'; count++)
+				;
 			char *filename = (char *)malloc(sz1 * sizeof(char));
 			filename = strtok(NULL, " ");
 			printf("[%s] [%s]\n", url, filename);
@@ -303,16 +319,21 @@ int main(void)
 				perror("[-]Error in opening file");
 				exit(1);
 			}
+			char* recq1 = (char *)malloc(300);
+			// sprintf(request, "PUT /%s/%s.%s %s\nHost: %s\nConnection: close\nDate: %s\nAccept: %s\nAccept-Language: en-us\nIf-Modified-Since: %s\nContent-language: en-us\nContent-length: %d\nContent-type: %s\n", path, filename, extension, version, host, date, accept_type, date2, sizeof(request), accept_type);
+			sprintf(recq1, "PUT /%s/%s.%s %s\nHost: %s\nConnection: close\nDate: %s\nAccept: %s\nAccept-Language: en-us\nIf-Modified-Since: %s\nContent-language: en-us\nContent-length: %d\nContent-type: %s\n", path, filename, "1", "2", host, "3", "4", "5", sizeof(request), "6");
+			send(sockfd, recq1, 300, 0);
 			send(sockfd, filename, 100, 0);
+
 			while ((ret = fread(buffer, 1, BUFSIZE, pdf_file)) > 0)
 				send(sockfd, buffer, ret, 0);
 			fprintf(stdout, "PUT's Response:\n");
 			// memset(buffer, '\0', BUFSIZE);
 			// while ((ret = recv(sockfd, buffer, BUFSIZE, 0)) > 0)
-			// {
-				char buf[10000];
-				recv(sockfd, buf, 10000, 0);
-				fprintf(stdout, "%s", buf);
+			// // {
+			// 	char buf[10000];
+			// 	recv(sockfd, buf, 10000, 0);
+			// 	fprintf(stdout, "%s", buf);
 			// }
 			close(sockfd);
 			fclose(pdf_file);

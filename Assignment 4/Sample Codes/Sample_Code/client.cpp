@@ -134,9 +134,6 @@ bool handlePUT(int& client_socket, char* filePath) {
 	const char* fileSendBuff = temp.c_str();
 	send(client_socket, fileSendBuff, BUFF_SIZE, 0);
 	cout << "File sent to the server" << endl;
-
 	client_file.close();
-
 	return true;
-
 }

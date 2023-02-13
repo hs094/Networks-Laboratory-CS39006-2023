@@ -9,7 +9,8 @@
 #define PORT 8080
 #define SERVER_ADDRESS "127.0.0.1"
 
-void error(const char *msg) {
+void error(const char *msg) 
+{
     perror(msg);
     exit(1);
 }
