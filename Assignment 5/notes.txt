@@ -1,0 +1,2 @@
+1. The Server is Iterative
+2. The Maximum size of the Message is 5000 bytes
