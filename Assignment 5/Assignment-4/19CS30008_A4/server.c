@@ -1,25 +1,19 @@
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
+#include "mysocket.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <signal.h>
-
-#include "mysocket.h"
 
 #define PORT_2 50017
 #define MAX_MSG_LEN 1000
 // Server
-int main() {
+int main()
+{
     int sockfd, newsockfd;
     struct sockaddr_in cli_addr, serv_addr;
     socklen_t clilen;
-    if ((sockfd = my_socket(AF_INET, SOCK_MyTCP, 0)) < 0) {
+    char msg[MAX_MSG_LEN];
+    if ((sockfd = my_socket(AF_INET, SOCK_MyTCP, 0)) < 0)
+    {
         perror("my_socket");
         exit(1);
     }
@@ -29,28 +23,31 @@ int main() {
     serv_addr.sin_port = htons(PORT_2);
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (my_bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    if (my_bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
         perror("Unable to bind local address\n");
-		exit(0);
+        exit(0);
     }
+    my_listen(sockfd, 5);
 
-    char msg[MAX_MSG_LEN];
-    // my_listen(sockfd, 5);
-    // while (1) {
-    //     u1_addr_len = sizeof(u1_addr);
-    //     memset(msg, 0, MAX_MSG_LEN);
-    //     int msg_len = my_recv(sockfd, msg, MAX_MSG_LEN, 0, (struct sockaddr *)&u1_addr, &u1_addr_len);
-    //     if(msg_len == 0) {
-    //         break;
-    //     }
-    //     if (msg_len < 0) {
-    //         perror("my_recv");
-    //         exit(1);
-    //     } else {
-    //         printf("%s", msg);
-    //         fflush(stdout);
-    //     }
-    // }
+    while (1)
+    {
+        clilen = sizeof(cli_addr);
+        newsockfd = my_accept(sockfd, (struct sockaddr *)&cli_addr, &clilen);
+        clilen = sizeof(cli_addr);
+		if (newsockfd < 0) {
+			perror("Accept error\n");
+			exit(0);
+		}
+		/* We initialize the msgfer, copy the message to it,
+			and send the message to the client. 
+		*/
+		strcpy(msg,"Message from server");
+		// my_send(newsockfd, msg, strlen(msg) + 1, 0);
+        // my_recv(newsockfd, msg, 100, 0);
+		printf("%s\n", msg);
+		my_close(newsockfd);
+    }
     my_close(sockfd);
     return 0;
 }
