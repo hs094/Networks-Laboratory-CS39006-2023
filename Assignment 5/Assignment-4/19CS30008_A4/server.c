@@ -16,27 +16,26 @@
 #define MAX_MSG_LEN 1000
 // Server
 int main() {
-    int sockfd;
+    int sockfd, newsockfd;
+    struct sockaddr_in cli_addr, serv_addr;
+    socklen_t clilen;
     if ((sockfd = my_socket(AF_INET, SOCK_MyTCP, 0)) < 0) {
         perror("my_socket");
         exit(1);
     }
 
-    struct sockaddr_in u2_addr;
-    struct sockaddr_in u1_addr;
-    socklen_t u1_addr_len;
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(PORT_2);
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    memset(&u2_addr, 0, sizeof(u2_addr));
-    u2_addr.sin_family = AF_INET;
-    u2_addr.sin_port = htons(PORT_2);
-    u2_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    if (my_bind(sockfd, (struct sockaddr *)&u2_addr, sizeof(u2_addr)) < 0) {
-        perror("my_bind");
-        exit(1);
+    if (my_bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        perror("Unable to bind local address\n");
+		exit(0);
     }
 
     char msg[MAX_MSG_LEN];
+    // my_listen(sockfd, 5);
     // while (1) {
     //     u1_addr_len = sizeof(u1_addr);
     //     memset(msg, 0, MAX_MSG_LEN);

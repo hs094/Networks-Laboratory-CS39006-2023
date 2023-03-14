@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -43,28 +42,33 @@ arbitary no. of bytes (max. 100) - msg
 */
 
 // Wrapper around pthread_mutex_lock for error checking
-void LOCK(pthread_mutex_t *mutex) {
+void LOCK(pthread_mutex_t *mutex)
+{
     int ret = pthread_mutex_lock(mutex);
-    if (ret != 0) {
+    if (ret != 0)
+    {
         ERROR("pthread_mutex_lock failed: %s", strerror(ret));
         exit(1);
     }
 }
 
 // Wrapper around pthread_mutex_unlock for error checking
-void UNLOCK(pthread_mutex_t *mutex) {
+void UNLOCK(pthread_mutex_t *mutex)
+{
     int ret = pthread_mutex_unlock(mutex);
-    if (ret != 0) {
+    if (ret != 0)
+    {
         ERROR("pthread_mutex_unlock failed: %s", strerror(ret));
         exit(1);
     }
 }
 
-short msg_cntr = 0;      // Message counter to keep track of next message id
-int tot_transm = 0;      // Total number of transmissions
-pthread_t tid_R, tid_S;  // Thread identifiers for the threads R and S
+short msg_cntr = 0;     // Message counter to keep track of next message id
+int tot_transm = 0;     // Total number of transmissions
+pthread_t tid_R, tid_S; // Thread identifiers for the threads R and S
 
-typedef struct _Received_Message_entry {
+typedef struct _Received_Message_entry
+{
     short msg_id;
     char *msg;
     size_t msg_len;
@@ -72,7 +76,8 @@ typedef struct _Received_Message_entry {
     socklen_t addrlen;
 } Received_Message_entry;
 
-typedef struct _Received_Message {
+typedef struct _Received_Message
+{
     Received_Message_entry *messages[MAX_TBL_SIZE];
     int in;
     int out;
@@ -80,12 +85,14 @@ typedef struct _Received_Message {
     pthread_mutex_t mutex;
 } Received_Message;
 
-Received_Message *recvd_msg_tbl;  // Received message table
+Received_Message *recvd_msg_tbl; // Received message table
 
 // Initializes the received message table
-void init_Received_Message() {
+void init_Received_Message()
+{
     recvd_msg_tbl = (Received_Message *)malloc(sizeof(Received_Message));
-    for (int i = 0; i < MAX_TBL_SIZE; i++) {
+    for (int i = 0; i < MAX_TBL_SIZE; i++)
+    {
         recvd_msg_tbl->messages[i] = NULL;
     }
     recvd_msg_tbl->in = 0;
@@ -99,13 +106,15 @@ void init_Received_Message() {
 
 // Adds a message to the back of received message table
 void enqueue_Received_Message(char *buf, size_t len, struct sockaddr *src_addr,
-                         socklen_t addrlen) {
+                              socklen_t addrlen)
+{
     recvd_msg_tbl->messages[recvd_msg_tbl->in] = (Received_Message_entry *)malloc(sizeof(Received_Message_entry));
     Received_Message_entry *in_entry = recvd_msg_tbl->messages[recvd_msg_tbl->in];
     in_entry->msg_len = len;
     in_entry->src_addr = *src_addr;
     in_entry->addrlen = addrlen;
-    if (len > 0) {
+    if (len > 0)
+    {
         in_entry->msg_id = ntohs(*(short *)(buf + TYPE_SIZE));
         in_entry->msg = (char *)malloc(len * sizeof(char));
         memcpy(in_entry->msg, buf + TYPE_SIZE + MSG_ID_SIZE, len);
@@ -117,14 +126,15 @@ void enqueue_Received_Message(char *buf, size_t len, struct sockaddr *src_addr,
 
 // Removes a message from the front of received message table
 size_t dequeue_Received_Message(void *buf, size_t len, struct sockaddr *src_addr,
-                           socklen_t *addrlen) {
+                                socklen_t *addrlen)
+{
     Received_Message_entry *out_entry = recvd_msg_tbl->messages[recvd_msg_tbl->out];
     size_t copy_len = len < out_entry->msg_len ? len : out_entry->msg_len;
     if (copy_len > 0)
         memcpy(buf, out_entry->msg, copy_len);
     *src_addr = out_entry->src_addr;
     *addrlen = out_entry->addrlen;
-    if (copy_len > 0) 
+    if (copy_len > 0)
         free(out_entry->msg);
     free(out_entry);
     recvd_msg_tbl->messages[recvd_msg_tbl->out] = NULL;
@@ -134,10 +144,13 @@ size_t dequeue_Received_Message(void *buf, size_t len, struct sockaddr *src_addr
 }
 
 // Frees the memory allocated to the received message table
-void free_Received_Message() {
+void free_Received_Message()
+{
     pthread_mutex_destroy(&recvd_msg_tbl->mutex);
-    for (int i = 0; i < MAX_TBL_SIZE; i++) {
-        if (recvd_msg_tbl->messages[i] != NULL) {
+    for (int i = 0; i < MAX_TBL_SIZE; i++)
+    {
+        if (recvd_msg_tbl->messages[i] != NULL)
+        {
             free(recvd_msg_tbl->messages[i]->msg);
             free(recvd_msg_tbl->messages[i]);
         }
@@ -145,7 +158,8 @@ void free_Received_Message() {
     free(recvd_msg_tbl);
 }
 
-typedef struct _Send_Message_entry {
+typedef struct _Send_Message_entry
+{
     int msg_id;
     char *msg;
     size_t msg_len;
@@ -155,18 +169,21 @@ typedef struct _Send_Message_entry {
     struct timeval sent_time;
 } Send_Message_entry;
 
-typedef struct _Send_Message {
+typedef struct _Send_Message
+{
     Send_Message_entry *messages[MAX_TBL_SIZE];
     int count;
     pthread_mutex_t mutex;
 } Send_Message;
 
-Send_Message *unackd_msg_table;  // Unacknowledged message table
+Send_Message *unackd_msg_table; // Unacknowledged message table
 
 // Initializes the unacknowledged message table
-void init_Send_Message() {
+void init_Send_Message()
+{
     unackd_msg_table = (Send_Message *)malloc(sizeof(Send_Message));
-    for (int i = 0; i < MAX_TBL_SIZE; i++) {
+    for (int i = 0; i < MAX_TBL_SIZE; i++)
+    {
         unackd_msg_table->messages[i] = NULL;
     }
     unackd_msg_table->count = 0;
@@ -178,9 +195,12 @@ void init_Send_Message() {
 
 // Adds a message to the unacknowledged message table
 void insert_Send_Message(char *buf, size_t len, int flags, const struct sockaddr *dest_addr,
-                         socklen_t addrlen, struct timeval sent_time, short msg_id) {
-    for (int i = 0; i < MAX_TBL_SIZE; i++) {
-        if (unackd_msg_table->messages[i] == NULL) {
+                         socklen_t addrlen, struct timeval sent_time, short msg_id)
+{
+    for (int i = 0; i < MAX_TBL_SIZE; i++)
+    {
+        if (unackd_msg_table->messages[i] == NULL)
+        {
             unackd_msg_table->messages[i] = (Send_Message_entry *)malloc(sizeof(Send_Message_entry));
             Send_Message_entry *curr_entry = unackd_msg_table->messages[i];
             curr_entry->msg = (char *)malloc(len * sizeof(char));
@@ -198,9 +218,12 @@ void insert_Send_Message(char *buf, size_t len, int flags, const struct sockaddr
 }
 
 // Removes a message from the unacknowledged message table
-void delete_Send_Message(short msg_id) {
-    for (int i = 0; i < MAX_TBL_SIZE; i++) {
-        if (unackd_msg_table->messages[i] != NULL && unackd_msg_table->messages[i]->msg_id == msg_id) {
+void delete_Send_Message(short msg_id)
+{
+    for (int i = 0; i < MAX_TBL_SIZE; i++)
+    {
+        if (unackd_msg_table->messages[i] != NULL && unackd_msg_table->messages[i]->msg_id == msg_id)
+        {
             free(unackd_msg_table->messages[i]->msg);
             free(unackd_msg_table->messages[i]);
             unackd_msg_table->messages[i] = NULL;
@@ -211,10 +234,13 @@ void delete_Send_Message(short msg_id) {
 }
 
 // Frees the memory allocated to the received message table
-void free_Send_Message() {
+void free_Send_Message()
+{
     pthread_mutex_destroy(&unackd_msg_table->mutex);
-    for (int i = 0; i < MAX_TBL_SIZE; i++) {
-        if (unackd_msg_table->messages[i] != NULL) {
+    for (int i = 0; i < MAX_TBL_SIZE; i++)
+    {
+        if (unackd_msg_table->messages[i] != NULL)
+        {
             free(unackd_msg_table->messages[i]->msg);
             free(unackd_msg_table->messages[i]);
         }
@@ -229,23 +255,29 @@ void free_Send_Message() {
     If it is a data message, calld dropMessage, accordingly adds to the received-message table and sends back an ACK
     If it is an ACK message, delete the appropriate message from the unacknowledged-message table
 */
-void *recv_thread(void *arg) {
+void *recv_thread(void *arg)
+{
     int sockfd = *(int *)arg;
-    while (1) {
+    while (1)
+    {
         struct sockaddr src_addr;
         socklen_t addrlen = sizeof(src_addr);
         char buf[MAX_FRAME_SIZE];
-        pthread_testcancel();  // cancellation point
+        pthread_testcancel(); // cancellation point
         ssize_t len = recvfrom(sockfd, buf, MAX_FRAME_SIZE, 0, &src_addr, &addrlen);
 
-        if (len >= 0) {
+        if (len >= 0)
+        {
             int drop = ((len > 0) && dropMessage(P));
-            if (drop) {
+            if (drop)
+            {
                 continue;
             }
-            if (len == 0 || (len > 0 && buf[0] == DATA_TYPE)) {
+            if (len == 0 || (len > 0 && buf[0] == DATA_TYPE))
+            {
                 LOCK(&recvd_msg_tbl->mutex);
-                while (recvd_msg_tbl->count == MAX_TBL_SIZE) {
+                while (recvd_msg_tbl->count == MAX_TBL_SIZE)
+                {
                     UNLOCK(&recvd_msg_tbl->mutex);
                     usleep(100);
                     LOCK(&recvd_msg_tbl->mutex);
@@ -255,7 +287,8 @@ void *recv_thread(void *arg) {
                 UNLOCK(&recvd_msg_tbl->mutex);
 
                 // need to send acknowledgement if len > 0
-                if (len > 0) {
+                if (len > 0)
+                {
                     char ack_frame[MAX_FRAME_SIZE];
                     ack_frame[0] = ACK_TYPE;
                     short msg_id = ntohs(*(short *)(buf + TYPE_SIZE));
@@ -263,17 +296,21 @@ void *recv_thread(void *arg) {
                     memcpy(ack_frame + TYPE_SIZE, &t, MSG_ID_SIZE);
                     sendto(sockfd, ack_frame, TYPE_SIZE + MSG_ID_SIZE, 0, &src_addr, addrlen);
                 }
-            } else {
+            }
+            else
+            {
                 assert(len > 0 && buf[0] == ACK_TYPE);
                 short msg_id = ntohs(*(short *)(buf + TYPE_SIZE));
                 LOCK(&unackd_msg_table->mutex);
                 delete_Send_Message(msg_id);
                 UNLOCK(&unackd_msg_table->mutex);
             }
-        } else {
+        }
+        else
+        {
             perror("recvfrom");
         }
-        pthread_testcancel();  // cancellation point
+        pthread_testcancel(); // cancellation point
     }
 }
 
@@ -285,26 +322,34 @@ void *recv_thread(void *arg) {
     If any message has timed out, resends it and updates its timestamp
     Does this for all messages in the unacknowledged-message table
 */
-void *send_thread(void *arg) {
+void *send_thread(void *arg)
+{
     int sockfd = *(int *)arg;
-    while (1) {
+    while (1)
+    {
         sleep(T);
         LOCK(&unackd_msg_table->mutex);
-        for (int i = 0; i < MAX_TBL_SIZE; i++) {
+        for (int i = 0; i < MAX_TBL_SIZE; i++)
+        {
             Send_Message_entry *curr_entry = unackd_msg_table->messages[i];
-            if (curr_entry != NULL) {
+            if (curr_entry != NULL)
+            {
                 struct timeval curr_time, diff;
                 gettimeofday(&curr_time, NULL);
                 timersub(&curr_time, &curr_entry->sent_time, &diff);
-                if (diff.tv_sec > TIMEOUT) {
+                if (diff.tv_sec > TIMEOUT)
+                {
                     // check return value to see if other side has closed connection
                     curr_entry->sent_time = curr_time;
                     Send_Message_entry send_entry = *curr_entry;
                     UNLOCK(&unackd_msg_table->mutex);
                     int ret = sendto(sockfd, send_entry.msg, send_entry.msg_len, send_entry.flags, &send_entry.dest_addr, send_entry.addrlen);
-                    if (ret >= 0) {
+                    if (ret >= 0)
+                    {
                         tot_transm++;
-                    } else {
+                    }
+                    else
+                    {
                         perror("sendto");
                     }
                     LOCK(&unackd_msg_table->mutex);
@@ -312,36 +357,42 @@ void *send_thread(void *arg) {
             }
         }
         UNLOCK(&unackd_msg_table->mutex);
-        pthread_testcancel();  // cancellation point
+        pthread_testcancel(); // cancellation point
     }
 }
 
-int dropMessage(float p) {
+int dropMessage(float p)
+{
     float rnd = (float)rand() / (float)RAND_MAX;
     return (rnd < p);
 }
 
 // Opens a UDP socket, creates threads R and S, allocates space for the 2 tables
-int my_socket(int domain, int type, int protocol) {
+int my_socket(int domain, int type, int protocol)
+{
     struct timeval seed;
     gettimeofday(&seed, NULL);
     srand(seed.tv_usec);
 
-    if (type != SOCK_MyTCP) {
-        ERROR("r_socket: type must be SOCK_MRP");
+    if (type != SOCK_MyTCP)
+    {
+        ERROR("r_socket: type must be SOCK_MyTCP");
         return -1;
     }
     int sockfd = socket(domain, SOCK_STREAM, protocol);
     int *sockfd_arg = (int *)malloc(sizeof(int));
     *sockfd_arg = sockfd;
-    if (sockfd >= 0) {
+    if (sockfd >= 0)
+    {
         init_Received_Message();
         init_Send_Message();
-        if (pthread_create(&tid_R, NULL, recv_thread, sockfd_arg) != 0) {
+        if (pthread_create(&tid_R, NULL, recv_thread, sockfd_arg) != 0)
+        {
             perror("pthread_create R");
             return -1;
         }
-        if (pthread_create(&tid_S, NULL, send_thread, sockfd_arg) != 0) {
+        if (pthread_create(&tid_S, NULL, send_thread, sockfd_arg) != 0)
+        {
             perror("pthread_create S");
             return -1;
         }
@@ -350,16 +401,54 @@ int my_socket(int domain, int type, int protocol) {
 }
 
 // Binds the socket with an address and a port
-int my_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
-    int ret = bind(sockfd, addr, addrlen);
+int my_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+{
+    int ret = 0;
+    if ((ret = bind(sockfd, addr, addrlen)) == -1)
+    {
+        perror("Listen Failed\n");
+        exit(1);
+    }
     return ret;
 }
 
 // Listen the socket with an address and a port and stores the message in the queue of size k
+int my_listen(int sockfd, int k)
+{
+    int ret = 0;
+    if ((ret = listen(sockfd, k)) == -1)
+    {
+        perror("Listen Failed\n");
+        exit(1);
+    }
+    return ret;
+}
+// Accept
+int my_accept(int sockfd, const struct sockaddr *cli_addr, socklen_t cli_len)
+{
+    int newsockfd = 0;
+    if ((newsockfd = accept(sockfd, (struct sockaddr *)&cli_addr, &cli_len)) < 0)
+    {
+        printf("Accept Failed\n");
+        exit(1);
+    }
+    return newsockfd;
+}
+int my_connect(int sockfd, const struct sockaddr *serv_addr, socklen_t serv_len)
+{
+    int ret = 0;
+    if (ret = connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    {
+        printf("Connect Failed\n");
+        exit(1);
+    }
+    return ret;
+}
 
 // Sends the message (by adding extra bytes to make the frame), and adds the message to the unacknowledged-message table
 ssize_t my_send(int sockfd, const void *buf, size_t len, int flags,
-                 const struct sockaddr *dest_addr, socklen_t addrlen) {
+                const struct sockaddr *dest_addr, socklen_t addrlen)
+{
     char data_frame[MAX_FRAME_SIZE];
     data_frame[0] = DATA_TYPE;
     short msg_id = msg_cntr++;
@@ -370,7 +459,8 @@ ssize_t my_send(int sockfd, const void *buf, size_t len, int flags,
     gettimeofday(&sent_time, NULL);
     ssize_t sent_len = sendto(sockfd, data_frame, TYPE_SIZE + MSG_ID_SIZE + len, flags, dest_addr, addrlen);
 
-    if (sent_len >= 0) {
+    if (sent_len >= 0)
+    {
         tot_transm++;
         LOCK(&unackd_msg_table->mutex);
         insert_Send_Message(data_frame, len + TYPE_SIZE + MSG_ID_SIZE, flags, dest_addr, addrlen, sent_time, msg_id);
@@ -382,14 +472,19 @@ ssize_t my_send(int sockfd, const void *buf, size_t len, int flags,
 // Checks the received-message table, if there is a message then returns that message and deletes it from the table
 // If there is no message, sleeps for some time and checks again
 ssize_t my_recv(int sockfd, void *buf, size_t len, int flags,
-                   struct sockaddr *src_addr, socklen_t *addrlen) {
-    while (1) {
+                struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    while (1)
+    {
         LOCK(&recvd_msg_tbl->mutex);
-        if (recvd_msg_tbl->count > 0) {
+        if (recvd_msg_tbl->count > 0)
+        {
             size_t recv_len = dequeue_Received_Message(buf, len, src_addr, addrlen);
             UNLOCK(&recvd_msg_tbl->mutex);
             return recv_len;
-        } else {
+        }
+        else
+        {
             UNLOCK(&recvd_msg_tbl->mutex);
             sleep(1);
         }
@@ -397,10 +492,12 @@ ssize_t my_recv(int sockfd, void *buf, size_t len, int flags,
 }
 
 // Kills threads R and S, frees the tables, closes the socket
-int my_close(int fd) {
+int my_close(int fd)
+{
     // Check if everything has been acked, only then go ahead
     LOCK(&unackd_msg_table->mutex);
-    while (unackd_msg_table->count > 0) {
+    while (unackd_msg_table->count > 0)
+    {
         UNLOCK(&unackd_msg_table->mutex);
         usleep(100);
         LOCK(&unackd_msg_table->mutex);
