@@ -58,6 +58,7 @@ void my_bind() // binds the socket with some address-port using the bind call.â€
             printf("Another socket is already listening on the same port\n");
         exit(1);
     }
+    
     return;
 }
 void my_listen()

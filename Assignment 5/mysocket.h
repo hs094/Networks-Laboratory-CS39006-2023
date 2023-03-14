@@ -26,8 +26,8 @@
 bool stop = false;
 char Send_Message[MAX_MSG_SIZE];
 char Received_Message[MAX_MSG_SIZE];
-queue<Info> ReceiveTable;
-queue<Info> SendTable;
+// queue<Info> ReceiveTable;
+// queue<Info> SendTable;
 
 void ctrl_c_signal_handler(int sig_num);
 void my_socket();  // This  function  opens  a  standard  TCP  socket  with  the  socket  call.  It  also  creates two threads R and S (to be described later), allocates and initializes space for two  tables  Send_Messageand Received_Message (to  be  described  later),  and  any  additional  space  that  may  be  needed.  The  parameters  to  these  are  the  same  as  the  normal socket( ) call, except that it will take only  SOCK_MyTCP as the socket type.  
