@@ -55,7 +55,7 @@ void UNLOCK(pthread_mutex_t *mutex)
     }
 }
 
-typedef struct 
+typedef struct _Queue
 {
     char *messages[MAX_QUEUE_SIZE];
     int in;
@@ -181,9 +181,8 @@ void *recv_thread(void *arg)
             }
         }
         int mess_size = 0;
-        for (int i = 3; i >= 0; i--)
-            mess_size = mess_size * 10 + buffer[i] - '0';
-        printf("Size ecieved  : %d \n", mess_size);
+        for (int i = 3; i >= 0; i--) mess_size = mess_size * 10 + buffer[i] - '0';
+        printf("Size Recieved  : %d \n", mess_size);
         int total_rec_bytes = 0;
         while (mess_size - total_rec_bytes > 0)
         {
@@ -195,15 +194,13 @@ void *recv_thread(void *arg)
             }
             total_rec_bytes += rec_bytes;
         }
-
         printf("Message Received : %s Queue Size : %d \n", message, Received_Message->out + 1);
-
         // Critical Section Starts
         LOCK(&Recv_Lock);
         while (isFull(Received_Message))
             pthread_cond_wait(&Recv_Cond, &Recv_Lock);
         enqueue(Received_Message, message);
-        printf("queue size : %d\n", Received_Message->size);
+        printf("Queue Size : %d\n", Received_Message->size);
         pthread_cond_signal(&Recv_Cond);
         UNLOCK(&Recv_Lock);
         // Critical Section Ends
@@ -234,9 +231,7 @@ void *send_thread(void *arg)
         pthread_cond_signal(&Send_Cond);
         UNLOCK(&Send_Lock);
         // Critical Section Ends
-        int mess_size = strlen(message);
-        if (mess_size > 5000)
-            mess_size = 5000;
+        int mess_size = strlen(message) > 5000 ? 5000 : strlen(message);
         int n = mess_size;
         char size_buff[4];
         for (int i = 0; i < 4; i++)
