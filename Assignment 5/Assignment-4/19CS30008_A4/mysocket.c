@@ -426,6 +426,7 @@ int my_accept(int sockfd, struct sockaddr *cli_addr, socklen_t cli_len)
     }
     return newsockfd;
 }
+// Wrapper Around Connect Call
 int my_connect(int sockfd, struct sockaddr *serv_addr, socklen_t serv_len)
 {
     int ret = connect(sockfd, serv_addr, serv_len);
