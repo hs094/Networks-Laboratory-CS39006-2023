@@ -199,19 +199,13 @@ void *recv_thread(void *arg)
         printf("Message Received : %s Queue Size : %d \n", message, Received_Message->out + 1);
 
         // Critical Section Starts
-
         LOCK(&Recv_Lock);
-
         while (isFull(Received_Message))
-        {
             pthread_cond_wait(&Recv_Cond, &Recv_Lock);
-            printf("waiting\n");
-        }
         enqueue(Received_Message, message);
         printf("queue size : %d\n", Received_Message->size);
         pthread_cond_signal(&Recv_Cond);
         UNLOCK(&Recv_Lock);
-
         // Critical Section Ends
     }
     pthread_exit(NULL);
@@ -258,8 +252,6 @@ void *send_thread(void *arg)
             int send_size = (mess_size - sent_len > 1000) ? 1000 : mess_size - sent_len;
             sent_len += send(sockfd, message + sent_len, send_size, 0);
         }
-        // send_message( message , sockfd ) ;
-        // sleep(5);
     }
     pthread_exit(NULL);
 }
@@ -417,7 +409,6 @@ ssize_t my_send(int Sockfd, char *buf, size_t len, int flags)
 
 // Checks the received-message table, if there is a message then returns that message and deletes it from the table
 // If there is no message, sleeps for some time and checks again
-
 ssize_t my_recv(int Sockfd, char *buf, size_t len, int flags)
 {
     // Critical Section Starts
