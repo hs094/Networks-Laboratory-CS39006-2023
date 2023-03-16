@@ -57,7 +57,7 @@ void UNLOCK(pthread_mutex_t *mutex)
 
 typedef struct
 {
-    char *items[MAX_QUEUE_SIZE];
+    char *messages[MAX_QUEUE_SIZE];
     int front;
     int rear;
     int size;
@@ -122,8 +122,8 @@ void enqueue(Queue *queue, char *item)
         printf("Error: Queue is full\n");
         exit(1);
     }
-    queue->items[queue->rear] = (char *)malloc(strlen(item) + 1);
-    strcpy(queue->items[queue->rear], item);
+    queue->messages[queue->rear] = (char *)malloc(strlen(item) + 1);
+    strcpy(queue->messages[queue->rear], item);
     queue->size++;
     queue->rear = (queue->rear + 1) % 10;
 }
@@ -141,7 +141,7 @@ char *dequeue(Queue *queue)
         printf("Error: Queue is empty\n");
         exit(1);
     }
-    char *item = queue->items[queue->front];
+    char *item = queue->messages[queue->front];
     queue->front = (queue->front + 1) % 10;
     queue->size--;
     return item;
@@ -149,10 +149,9 @@ char *dequeue(Queue *queue)
 
 Queue *Send_Message, *Received_Message;
 
-pthread_t R, S;
-
-pthread_mutex_t Rq_lock, Sq_lock;
-pthread_cond_t Rq_cond, Sq_cond;
+pthread_t tid_R, tid_S;
+pthread_mutex_t Recv_Lock, Send_Lock;
+pthread_cond_t Recv_Cond, Send_Cond;
 
 /**
  * @brief
@@ -206,17 +205,17 @@ void *recv_thread(void *arg)
 
         // Critical Section Starts
 
-        LOCK(&Rq_lock);
+        LOCK(&Recv_Lock);
 
         while (isFull(Received_Message))
         {
-            pthread_cond_wait(&Rq_cond, &Rq_lock);
+            pthread_cond_wait(&Recv_Cond, &Recv_Lock);
             printf("waiting\n");
         }
         enqueue(Received_Message, message);
         printf("queue size : %d\n", Received_Message->size);
-        pthread_cond_signal(&Rq_cond);
-        UNLOCK(&Rq_lock);
+        pthread_cond_signal(&Recv_Cond);
+        UNLOCK(&Recv_Lock);
 
         // Critical Section Ends
     }
@@ -239,14 +238,12 @@ void *send_thread(void *arg)
         char buf[1000];
         char message[5000];
         // Critical Section Starts
-        LOCK(&Sq_lock);
+        LOCK(&Send_Lock);
         while (isEmpty(Send_Message))
-        {
-            pthread_cond_wait(&Sq_cond, &Sq_lock);
-        }
+            pthread_cond_wait(&Send_Cond, &Send_Lock);
         strcpy(message, dequeue(Send_Message));
-        pthread_cond_signal(&Sq_cond);
-        UNLOCK(&Sq_lock);
+        pthread_cond_signal(&Send_Cond);
+        UNLOCK(&Send_Lock);
         // Critical Section Ends
         int mess_size = strlen(message);
         if (mess_size > 5000)
@@ -306,17 +303,17 @@ int my_socket(int domain, int type, int protocol)
 
     sprintf(sockfd_arr, "%d", sockfd);
     // cond inits
-    pthread_cond_init(&Rq_cond, NULL);
-    pthread_cond_init(&Sq_cond, NULL);
+    pthread_cond_init(&Recv_Cond, NULL);
+    pthread_cond_init(&Send_Cond, NULL);
 
     // mutex inits
-    pthread_mutex_init(&Rq_lock, NULL);
-    pthread_mutex_init(&Sq_lock, NULL);
+    pthread_mutex_init(&Recv_Lock, NULL);
+    pthread_mutex_init(&Send_Lock, NULL);
 
     Send_Message = createQueue();
     Received_Message = createQueue();
-    pthread_create(&R, NULL, recv_thread, (void *)sockfd_arr);
-    pthread_create(&S, NULL, send_thread, (void *)sockfd_arr);
+    pthread_create(&tid_R, NULL, recv_thread, (void *)sockfd_arr);
+    pthread_create(&tid_S, NULL, send_thread, (void *)sockfd_arr);
     return sockfd;
 }
 
@@ -403,12 +400,12 @@ int my_connect(int sockfd, struct sockaddr *serv_addr, socklen_t serv_len)
 ssize_t my_send(int Sockfd, char *buf, size_t len, int flags)
 {
     // Critical Section Starts
-    LOCK(&Sq_lock);
+    LOCK(&Send_Lock);
     while (isFull(Send_Message))
-        pthread_cond_wait(&Sq_cond, &Sq_lock);
+        pthread_cond_wait(&Send_Cond, &Send_Lock);
     enqueue(Send_Message, buf);
-    pthread_cond_signal(&Sq_cond);
-    UNLOCK(&Sq_lock);
+    pthread_cond_signal(&Send_Cond);
+    UNLOCK(&Send_Lock);
     // Critical Section Ends
     return strlen(buf);
 }
@@ -429,12 +426,12 @@ ssize_t my_send(int Sockfd, char *buf, size_t len, int flags)
 ssize_t my_recv(int Sockfd, char *buf, size_t len, int flags)
 {
     // Critical Section Starts
-    LOCK(&Rq_lock);
+    LOCK(&Recv_Lock);
     while (isEmpty(Received_Message))
-        pthread_cond_wait(&Rq_cond, &Rq_lock);
+        pthread_cond_wait(&Recv_Cond, &Recv_Lock);
     strcpy(buf, dequeue(Received_Message));
-    pthread_cond_signal(&Rq_cond);
-    UNLOCK(&Rq_lock);
+    pthread_cond_signal(&Recv_Cond);
+    UNLOCK(&Recv_Lock);
     // Critical Section Ends
     return strlen(buf);
 }
@@ -448,8 +445,8 @@ ssize_t my_recv(int Sockfd, char *buf, size_t len, int flags)
 // Kills threads R and S, frees the tables, closes the socket
 int my_close(int Sockfd)
 {
-    pthread_cancel(R);
-    pthread_cancel(S);
+    pthread_cancel(tid_R);
+    pthread_cancel(tid_S);
     destroyQueue(Send_Message);
     destroyQueue(Received_Message);
     close(Sockfd);
