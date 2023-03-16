@@ -55,11 +55,11 @@ void UNLOCK(pthread_mutex_t *mutex)
     }
 }
 
-typedef struct
+typedef struct 
 {
     char *messages[MAX_QUEUE_SIZE];
-    int front;
-    int rear;
+    int in;
+    int out;
     int size;
 } Queue;
 
@@ -71,8 +71,8 @@ typedef struct
 Queue *createQueue()
 {
     Queue *queue = (Queue *)malloc(sizeof(Queue));
-    queue->front = 0;
-    queue->rear = 0;
+    queue->in = 0;
+    queue->out = 0;
     queue->size = 0;
     return queue;
 }
@@ -122,10 +122,10 @@ void enqueue(Queue *queue, char *item)
         printf("Error: Queue is full\n");
         exit(1);
     }
-    queue->messages[queue->rear] = (char *)malloc(strlen(item) + 1);
-    strcpy(queue->messages[queue->rear], item);
+    queue->messages[queue->out] = (char *)malloc(strlen(item) + 1);
+    strcpy(queue->messages[queue->out], item);
     queue->size++;
-    queue->rear = (queue->rear + 1) % 10;
+    queue->out = (queue->out + 1) % 10;
 }
 
 /**
@@ -141,8 +141,8 @@ char *dequeue(Queue *queue)
         printf("Error: Queue is empty\n");
         exit(1);
     }
-    char *item = queue->messages[queue->front];
-    queue->front = (queue->front + 1) % 10;
+    char *item = queue->messages[queue->in];
+    queue->in = (queue->in + 1) % 10;
     queue->size--;
     return item;
 }
@@ -168,10 +168,8 @@ void *recv_thread(void *arg)
         int sockfd = my_sockfd;
         char buf[1000];
         char message[5000];
-
         int mess_bytes = 0;
         char buffer[4];
-
         while (4 - mess_bytes > 0)
         {
             int rec_bytes = recv(sockfd, buffer + mess_bytes, 4 - mess_bytes, 0);
@@ -181,14 +179,11 @@ void *recv_thread(void *arg)
                 is_connect = 0;
                 break;
             }
-            // printf("0\n");
         }
         int mess_size = 0;
         for (int i = 3; i >= 0; i--)
-        {
             mess_size = mess_size * 10 + buffer[i] - '0';
-        }
-        printf("size recieved  : %d \n", mess_size);
+        printf("Size ecieved  : %d \n", mess_size);
         int total_rec_bytes = 0;
         while (mess_size - total_rec_bytes > 0)
         {
@@ -201,7 +196,7 @@ void *recv_thread(void *arg)
             total_rec_bytes += rec_bytes;
         }
 
-        printf("mess rec : %s queue size : %d \n", message, Received_Message->rear + 1);
+        printf("Message Received : %s Queue Size : %d \n", message, Received_Message->out + 1);
 
         // Critical Section Starts
 
