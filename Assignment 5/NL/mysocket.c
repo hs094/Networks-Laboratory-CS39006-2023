@@ -69,7 +69,7 @@ typedef struct _Received_Message
  */
 Received_Message *create_Received_Message()
 {
-    Received_Message *Received_Message_Table = (Received_Message *)malloc(1*sizeof(Received_Message));
+    Received_Message *Received_Message_Table = (Received_Message *)malloc(1 * sizeof(Received_Message));
     Received_Message_Table->in = 0;
     Received_Message_Table->out = 0;
     Received_Message_Table->size = 0;
@@ -146,7 +146,6 @@ char *remove_Received_Message(Received_Message *Received_Message)
     return item;
 }
 
-
 typedef struct _Send_Message
 {
     char *messages[MAX_QUEUE_SIZE];
@@ -214,9 +213,9 @@ void add_Send_Message(Send_Message *Send_Message, char *item)
         printf("Error: Send_Message is full\n");
         exit(1);
     }
+    Send_Message->size++;
     Send_Message->messages[Send_Message->out] = (char *)malloc(strlen(item) + 1);
     strcpy(Send_Message->messages[Send_Message->out], item);
-    Send_Message->size++;
     Send_Message->out = (Send_Message->out + 1) % 10;
 }
 
@@ -233,9 +232,9 @@ char *remove_Send_Message(Send_Message *Send_Message)
         printf("Error: Send_Message is empty\n");
         exit(1);
     }
+    Send_Message->size--;
     char *item = Send_Message->messages[Send_Message->in];
     Send_Message->in = (Send_Message->in + 1) % 10;
-    Send_Message->size--;
     return item;
 }
 
@@ -308,7 +307,9 @@ void *sendThread(void *arg)
 {
     while (1)
     {
-        sleep(T);
+        // Sleep for 0.2 seconds (200000 microseconds)
+        usleep(200000);
+        // sleep(T);
         if (connectionStatus == 0)
             continue;
         int sockfd = mySocketfd;
@@ -321,7 +322,7 @@ void *sendThread(void *arg)
         pthread_cond_signal(&Send_Cond);
         UNLOCK(&Send_Lock);
         // Critical Section Ends
-        int messageSize = strlen(message) > MAX_MSG ? MAX_MSG : strlen(message);
+        int messageSize = min(strlen(message), MAX_MSG);
         int n = messageSize;
         char sizeBuffer[4];
         for (int i = 0; i < 4; i++)
@@ -336,7 +337,6 @@ void *sendThread(void *arg)
             int sendSize = (messageSize - sentLength > MAX_ONE) ? MAX_ONE : messageSize - sentLength;
             sentLength += send(sockfd, message + sentLength, sendSize, 0);
         }
-        
     }
     pthread_exit(NULL);
 }
