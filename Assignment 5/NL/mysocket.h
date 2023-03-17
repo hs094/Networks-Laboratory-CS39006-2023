@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 
 #define SOCK_MyTCP 15
-#define T 2
+#define T 1
 #define P 0.05
 #define TIMEOUT (2 * T)
 #define MAX_QUEUE_SIZE 10

@@ -259,14 +259,13 @@ void *recvThread(void *arg)
         if (connectionStatus == 0)
             continue;
         int sockfd = mySocketfd;
-        char buf[MAX_ONE];
         char message[MAX_MSG];
-        int mess_bytes = 0;
+        int messageBytes = 0;
         char buffer[4];
-        while (4 - mess_bytes > 0)
+        while (4 - messageBytes > 0)
         {
-            int rec_bytes = recv(sockfd, buffer + mess_bytes, 4 - mess_bytes, 0);
-            mess_bytes += rec_bytes;
+            int rec_bytes = recv(sockfd, buffer + messageBytes, 4 - messageBytes, 0);
+            messageBytes += rec_bytes;
             if (rec_bytes == 0)
             {
                 connectionStatus = 0;
@@ -276,16 +275,16 @@ void *recvThread(void *arg)
         int messageSize = 0;
         for (int i = 3; i >= 0; i--)
             messageSize = messageSize * 10 + buffer[i] - '0';
-        int total_rec_bytes = 0;
-        while (messageSize - total_rec_bytes > 0)
+        int totalRecvBytes = 0;
+        while (messageSize - totalRecvBytes > 0)
         {
-            int rec_bytes = recv(sockfd, message + total_rec_bytes, messageSize - total_rec_bytes, 0);
+            int rec_bytes = recv(sockfd, message + totalRecvBytes, messageSize - totalRecvBytes, 0);
             if (rec_bytes == 0)
             {
                 connectionStatus = 0;
                 break;
             }
-            total_rec_bytes += rec_bytes;
+            totalRecvBytes += rec_bytes;
         }
         // Critical Section Starts
         LOCK(&Recv_Lock);
@@ -309,6 +308,7 @@ void *sendThread(void *arg)
 {
     while (1)
     {
+        sleep(T);
         if (connectionStatus == 0)
             continue;
         int sockfd = mySocketfd;
@@ -336,6 +336,7 @@ void *sendThread(void *arg)
             int sendSize = (messageSize - sentLength > MAX_ONE) ? MAX_ONE : messageSize - sentLength;
             sentLength += send(sockfd, message + sentLength, sendSize, 0);
         }
+        
     }
     pthread_exit(NULL);
 }

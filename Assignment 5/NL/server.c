@@ -105,14 +105,18 @@ int main()
 		{
 			my_recv(newsockfd, buf, 100, 0);
 			printf("%d: %s\n", i, buf);
-			for (int i = 0; i < 100; i++)
-				buf[i] = '\0';
+			bzero(buf, 100);
 		}
 		my_recv(newsockfd, buf, 100, 0);
 		printf("100: %s\n", buf);
-		sleep(1);
 		strcpy(buf, "Message from server");
+		for (int i = 0; i < 100; i++)
+		{
+			my_send(newsockfd, buf, 100, 0);
+			printf("%d: %s\n", i, buf);
+		}
 		my_send(newsockfd, buf, 100, 0);
+		printf("100: %s\n", buf);
 		/* We now receive a message from the client. For this example
 		   we make an assumption that the entire message sent from the
 		   client will come together. In general, this need not be true
