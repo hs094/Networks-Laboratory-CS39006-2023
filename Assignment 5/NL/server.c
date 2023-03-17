@@ -4,8 +4,6 @@
 In this program we illustrate the use of Berkeley sockets for interprocess
 communication across the network. We show the communication between a server
 process and a client process.
-
-
 */
 
 #include <stdio.h>
@@ -101,20 +99,20 @@ int main()
 		/* We initialize the buffer, copy the message to it,
 			and send the message to the client.
 		*/
-		for (int i = 0; i < 100; i++)
+		for (int i = 0; i < 20; i++)
 		{
-			my_recv(newsockfd, buf, 100, 0);
+			my_recv(newsockfd, buf, strlen(buf), 0);
 			printf("%d: %s\n", i, buf);
 			bzero(buf, 100);
 		}
-		my_recv(newsockfd, buf, 100, 0);
+		my_recv(newsockfd, buf, strlen(buf), 0);
 		printf("100: %s\n", buf);
 		strcpy(buf, "Message from server");
-		for (int i = 0; i < 100; i++)
-		{
-			my_send(newsockfd, buf, 100, 0);
-			printf("%d: %s\n", i, buf);
-		}
+		// for (int i = 0; i < 20; i++)
+		// {
+		// 	my_send(newsockfd, buf, 100, 0);
+		// 	printf("%d: %s\n", i, buf);
+		// }
 		my_send(newsockfd, buf, 100, 0);
 		printf("100: %s\n", buf);
 		/* We now receive a message from the client. For this example

@@ -61,16 +61,18 @@ int main()
 	   non-blocking modes, refer to the online man pages.
 	*/
 	strcpy(buf, "Message from client");
-	for (int i = 0; i < 100; i++)
-		my_send(sockfd, buf, 100, 0);
-	my_send(sockfd, buf, 100, 0);
+	for (int i = 0; i < 20; i++)
+		my_send(sockfd, buf, strlen(buf)+1, 0);
+	my_send(sockfd, buf, strlen(buf)+1, 0);
 	bzero(buf, 100);
-	for (int i = 0; i < 100; i++)
-	{
-		my_recv(sockfd, buf, 100, 0);
-		printf("%d: %s\n", i, buf);
-		bzero(buf, 100);
-	}
+	// for (int i = 0; i < 20; i++)
+	// {
+	// 	my_recv(sockfd, buf, strlen(buf), 0);
+	// 	printf("%d: %s\n", i, buf);
+	// 	bzero(buf, 100);
+	// }
+	my_recv(sockfd, buf, strlen(buf), 0);
+	printf("100: %s\n", i, buf);
 	printf("[%s]\n", buf);
 	my_close(sockfd);
 	return 0;

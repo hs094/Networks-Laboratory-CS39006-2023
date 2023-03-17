@@ -31,12 +31,16 @@
 #define min(a, b) a > b ? b : a
 
 int connectionStatus;
-int mySocketfd;
+long int mySocketfd;
+
+pthread_t tid_R, tid_S;
+pthread_mutex_t Recv_Lock, Send_Lock;
+pthread_cond_t Recv_Cond, Send_Cond;
 
 // Wrapper around pthread_mutex_lock for error checking
 void LOCK(pthread_mutex_t *mutex)
 {
-    int ret = pthread_mutex_lock(mutex);
+    long int ret = pthread_mutex_lock(mutex);
     if (ret != 0)
     {
         ERROR("pthread_mutex_lock failed: %s", strerror(ret));
@@ -47,7 +51,7 @@ void LOCK(pthread_mutex_t *mutex)
 // Wrapper around pthread_mutex_unlock for error checking
 void UNLOCK(pthread_mutex_t *mutex)
 {
-    int ret = pthread_mutex_unlock(mutex);
+    long int ret = pthread_mutex_unlock(mutex);
     if (ret != 0)
     {
         ERROR("pthread_mutex_unlock failed: %s", strerror(ret));
@@ -57,10 +61,11 @@ void UNLOCK(pthread_mutex_t *mutex)
 typedef struct _Received_Message
 {
     char *messages[MAX_QUEUE_SIZE];
-    int in;
-    int out;
-    int size;
+    long int in;
+    long int out;
+    long int size;
 } Received_Message;
+
 Received_Message *create_Received_Message()
 {
     Received_Message *Received_Message_Table = (Received_Message *)malloc(1 * sizeof(Received_Message));
@@ -75,11 +80,17 @@ void destroy_Received_Message(Received_Message *Received_Message)
 }
 int is_Empty_Recv(Received_Message *Received_Message)
 {
-    return (Received_Message->size == 0);
+    if (Received_Message->size == 0)
+        return 1;
+    else
+        return 0;
 }
 int is_Full_Recv(Received_Message *Received_Message)
 {
-    return (Received_Message->size == MAX_QUEUE_SIZE);
+    if (Received_Message->size == MAX_QUEUE_SIZE)
+        return 1;
+    else
+        return 0;
 }
 void add_Received_Message(Received_Message *Received_Message, char *item)
 {
@@ -88,9 +99,9 @@ void add_Received_Message(Received_Message *Received_Message, char *item)
         printf("Error: Received_Message is full\n");
         exit(1);
     }
+    Received_Message->size++;
     Received_Message->messages[Received_Message->out] = (char *)malloc(strlen(item) + 1);
     strcpy(Received_Message->messages[Received_Message->out], item);
-    Received_Message->size++;
     Received_Message->out = (Received_Message->out + 1) % 10;
 }
 
@@ -101,20 +112,19 @@ char *remove_Received_Message(Received_Message *Received_Message)
         printf("Error: Received_Message is empty\n");
         exit(1);
     }
+    Received_Message->size--;
     char *item = Received_Message->messages[Received_Message->in];
     Received_Message->in = (Received_Message->in + 1) % 10;
-    Received_Message->size--;
     return item;
 }
 
 typedef struct _Send_Message
 {
     char *messages[MAX_QUEUE_SIZE];
-    int in;
-    int out;
-    int size;
+    long int in;
+    long int out;
+    long int size;
 } Send_Message;
-
 
 Send_Message *create_Send_Message()
 {
@@ -131,12 +141,18 @@ void destroy_Send_Message(Send_Message *Send_Message)
 }
 int is_Empty_Send(Send_Message *Send_Message)
 {
-    return (Send_Message->size == 0);
+    if (Send_Message->size == 0)
+        return 1;
+    else
+        return 0;
 }
 
 int is_Full_Send(Send_Message *Send_Message)
 {
-    return (Send_Message->size == MAX_QUEUE_SIZE);
+    if ((Send_Message->size == MAX_QUEUE_SIZE))
+        return 1;
+    else
+        return 0;
 }
 
 void add_Send_Message(Send_Message *Send_Message, char *item)
@@ -168,25 +184,24 @@ char *remove_Send_Message(Send_Message *Send_Message)
 Send_Message *Send_Message_Table;
 Received_Message *Received_Message_Table;
 
-pthread_t tid_R, tid_S;
-pthread_mutex_t Recv_Lock, Send_Lock;
-pthread_cond_t Recv_Cond, Send_Cond;
 
 void *recvThread(void *arg)
 {
-    for (;1;)
+    for (; 1;)
     {
         if (connectionStatus == 0)
             continue;
+        long int messages = 0;
+        long int Size = 1;
         int sockfd = mySocketfd;
         char message[MAX_MSG];
-        int messageBytes = 0;
-        int messageSize = 0;
-        int totalRecvBytes = 0;
+        long messageBytes = 0;
+        long int messageSize = 0;
+        long totalRecvBytes = 0;
         char buffer[4];
-        for (;4 - messageBytes > 0;)
+        for (; (4 - messageBytes)*Size+messages > 0;)
         {
-            int rec_bytes = recv(sockfd, buffer + messageBytes, 4 - messageBytes, 0);
+            ssize_t rec_bytes = recv(sockfd, buffer + messageBytes, 4 - messageBytes, 0);
             messageBytes += rec_bytes;
             if (rec_bytes == 0)
             {
@@ -195,20 +210,20 @@ void *recvThread(void *arg)
             }
         }
         for (int i = 3; i >= 0; i--)
-            messageSize = messageSize * 10 + buffer[i] - '0';
+            messageSize = messageSize * Size * 10 + (buffer[i] - '0') * Size + messages;
         for (; messageSize - totalRecvBytes > 0;)
         {
-            int rec_bytes = recv(sockfd, message + totalRecvBytes, messageSize - totalRecvBytes, 0);
+            ssize_t rec_bytes = recv(sockfd, message + totalRecvBytes * Size, messageSize - totalRecvBytes * Size + messages, 0);
             if (rec_bytes == 0)
             {
                 connectionStatus = 0;
                 break;
             }
-            totalRecvBytes += rec_bytes;
+            totalRecvBytes += rec_bytes * Size;
         }
         // Critical Section Starts
         LOCK(&Recv_Lock);
-        for (;is_Full_Recv(Received_Message_Table);)
+        for (; is_Full_Recv(Received_Message_Table);)
             pthread_cond_wait(&Recv_Cond, &Recv_Lock);
         add_Received_Message(Received_Message_Table, message);
         pthread_cond_signal(&Recv_Cond);
@@ -220,36 +235,38 @@ void *recvThread(void *arg)
 
 void *sendThread(void *arg)
 {
-    for (;1;)
+    for (; 1;)
     {
         // Sleep for 0.2 seconds (200000 microseconds)
-        usleep(200000);
+        sleep(1);
         if (connectionStatus == 0)
             continue;
         char message[MAX_MSG];
         // Critical Section Starts
         LOCK(&Send_Lock);
-        for (;is_Empty_Send(Send_Message_Table);)
+        for (; is_Empty_Send(Send_Message_Table);)
             pthread_cond_wait(&Send_Cond, &Send_Lock);
         strcpy(message, remove_Send_Message(Send_Message_Table));
         pthread_cond_signal(&Send_Cond);
         UNLOCK(&Send_Lock);
         // Critical Section Ends
-        int sockfd = mySocketfd;
+        long int messages = 0;
+        long int Size = 1;
+        long int sockfd = mySocketfd;
         int messageSize = min(strlen(message), MAX_MSG);
         int n = messageSize;
         char sizeBuffer[4];
-        for (int i = 0; i < 4; i++)
+        for (long int i = 0; i < 4; i++)
         {
-            sizeBuffer[i] = '0' + n % 10;
-            n = n / 10;
+            sizeBuffer[i] = '0' + (n % 10) * Size + messages;
+            n = n / (10 * Size);
         }
         send(sockfd, sizeBuffer, 4, 0);
-        int sentLength = 0;
-        for (;sentLength < messageSize;)
+        ssize_t sentLength = 0;
+        for (; sentLength < messageSize;)
         {
-            int sendSize = min(MAX_ONE, messageSize - sentLength);
-            sentLength += send(sockfd, message + sentLength, sendSize, 0);
+            int sendSize = min(MAX_ONE + messages, (messageSize - sentLength) * Size);
+            sentLength += send(sockfd, message + sentLength * Size + messages, sendSize, 0);
         }
     }
     pthread_exit(NULL);
@@ -273,13 +290,7 @@ int my_socket(int domain, int type, int protocol)
         perror("Cannot create socket\n");
         exit(0);
     }
-    int *sockfd_arg = (int *)malloc(sizeof(int));
-    *sockfd_arg = sockfd;
 
-    mySocketfd = sockfd;
-    char sockfd_arr[10];
-
-    sprintf(sockfd_arr, "%d", sockfd);
     // cond inits
     pthread_cond_init(&Recv_Cond, NULL);
     pthread_cond_init(&Send_Cond, NULL);
@@ -288,10 +299,20 @@ int my_socket(int domain, int type, int protocol)
     pthread_mutex_init(&Recv_Lock, NULL);
     pthread_mutex_init(&Send_Lock, NULL);
 
+    long int *sockfd_arg = (long int *)malloc(sizeof(long int));
+    *sockfd_arg = sockfd;
+
+    mySocketfd = sockfd;
+    char sockfd_arr[10];
+
+    sprintf(sockfd_arr, "%d", sockfd);
+    
     Send_Message_Table = create_Send_Message();
     Received_Message_Table = create_Received_Message();
+    
     pthread_create(&tid_R, NULL, recvThread, (void *)sockfd_arr);
     pthread_create(&tid_S, NULL, sendThread, (void *)sockfd_arr);
+    
     return sockfd;
 }
 
@@ -339,7 +360,7 @@ ssize_t my_send(int sockfd, char *buf, size_t len, int flags)
 {
     // Critical Section Starts
     LOCK(&Send_Lock);
-    for (;is_Full_Send(Send_Message_Table);)
+    for (; is_Full_Send(Send_Message_Table);)
         pthread_cond_wait(&Send_Cond, &Send_Lock);
     add_Send_Message(Send_Message_Table, buf);
     pthread_cond_signal(&Send_Cond);
@@ -348,14 +369,13 @@ ssize_t my_send(int sockfd, char *buf, size_t len, int flags)
     return strlen(buf);
 }
 
-
 // Checks the received-message table, if there is a message then returns that message and deletes it from the table
 // If there is no message, sleeps for some time and checks again
 ssize_t my_recv(int sockfd, char *buf, size_t len, int flags)
 {
     // Critical Section Starts
     LOCK(&Recv_Lock);
-    for (;is_Empty_Recv(Received_Message_Table);)
+    for (; is_Empty_Recv(Received_Message_Table);)
         pthread_cond_wait(&Recv_Cond, &Recv_Lock);
     strcpy(buf, remove_Received_Message(Received_Message_Table));
     pthread_cond_signal(&Recv_Cond);
