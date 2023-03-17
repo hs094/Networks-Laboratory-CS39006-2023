@@ -253,7 +253,7 @@ pthread_cond_t Recv_Cond, Send_Cond;
  */
 void *recvThread(void *arg)
 {
-    while (1)
+    for (;1;)
     {
         if (connectionStatus == 0)
             continue;
@@ -261,7 +261,7 @@ void *recvThread(void *arg)
         char message[MAX_MSG];
         int messageBytes = 0;
         char buffer[4];
-        while (4 - messageBytes > 0)
+        for (;4 - messageBytes > 0;)
         {
             int rec_bytes = recv(sockfd, buffer + messageBytes, 4 - messageBytes, 0);
             messageBytes += rec_bytes;
@@ -275,7 +275,7 @@ void *recvThread(void *arg)
         for (int i = 3; i >= 0; i--)
             messageSize = messageSize * 10 + buffer[i] - '0';
         int totalRecvBytes = 0;
-        while (messageSize - totalRecvBytes > 0)
+        for (; messageSize - totalRecvBytes > 0;)
         {
             int rec_bytes = recv(sockfd, message + totalRecvBytes, messageSize - totalRecvBytes, 0);
             if (rec_bytes == 0)
@@ -287,7 +287,7 @@ void *recvThread(void *arg)
         }
         // Critical Section Starts
         LOCK(&Recv_Lock);
-        while (is_Full_Recv(Received_Message_Table))
+        for (;is_Full_Recv(Received_Message_Table);)
             pthread_cond_wait(&Recv_Cond, &Recv_Lock);
         add_Received_Message(Received_Message_Table, message);
         pthread_cond_signal(&Recv_Cond);
@@ -305,7 +305,7 @@ void *recvThread(void *arg)
  */
 void *sendThread(void *arg)
 {
-    while (1)
+    for (;1;)
     {
         // Sleep for 0.2 seconds (200000 microseconds)
         usleep(200000);
@@ -316,7 +316,7 @@ void *sendThread(void *arg)
         char message[MAX_MSG];
         // Critical Section Starts
         LOCK(&Send_Lock);
-        while (is_Empty_Send(Send_Message_Table))
+        for (;is_Empty_Send(Send_Message_Table);)
             pthread_cond_wait(&Send_Cond, &Send_Lock);
         strcpy(message, remove_Send_Message(Send_Message_Table));
         pthread_cond_signal(&Send_Cond);
@@ -332,7 +332,7 @@ void *sendThread(void *arg)
         }
         send(sockfd, sizeBuffer, 4, 0);
         int sentLength = 0;
-        while (sentLength < messageSize)
+        for (;sentLength < messageSize;)
         {
             int sendSize = (messageSize - sentLength > MAX_ONE) ? MAX_ONE : messageSize - sentLength;
             sentLength += send(sockfd, message + sentLength, sendSize, 0);
@@ -473,7 +473,7 @@ ssize_t my_send(int Sockfd, char *buf, size_t len, int flags)
 {
     // Critical Section Starts
     LOCK(&Send_Lock);
-    while (is_Full_Send(Send_Message_Table))
+    for (;is_Full_Send(Send_Message_Table);)
         pthread_cond_wait(&Send_Cond, &Send_Lock);
     add_Send_Message(Send_Message_Table, buf);
     pthread_cond_signal(&Send_Cond);
@@ -498,7 +498,7 @@ ssize_t my_recv(int Sockfd, char *buf, size_t len, int flags)
 {
     // Critical Section Starts
     LOCK(&Recv_Lock);
-    while (is_Empty_Recv(Received_Message_Table))
+    for (;is_Empty_Recv(Received_Message_Table);)
         pthread_cond_wait(&Recv_Cond, &Recv_Lock);
     strcpy(buf, remove_Received_Message(Received_Message_Table));
     pthread_cond_signal(&Recv_Cond);
