@@ -7,25 +7,28 @@ process and a client process.
 
 
 */
-#include "mysocket.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/socket.h> 
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
+#include "mysocket.h"
 
-			/* THE SERVER PROCESS */
-#define PORT 50017
+/* THE SERVER PROCESS */
 
 int main()
 {
-	int			sockfd, newsockfd ; /* Socket descriptors */
-	int			clilen;
-	struct sockaddr_in	cli_addr, serv_addr;
-	char buf[100];		/* We will use this buffer for communication */
+	int sockfd, newsockfd; /* Socket descriptors */
+	int clilen;
+	struct sockaddr_in cli_addr, serv_addr;
+
+	int i;
+	char buf[100]; /* We will use this buffer for communication */
 
 	/* The following system call opens a socket. The first parameter
 	   indicates the family of the protocol to be followed. For internet
@@ -33,34 +36,37 @@ int main()
 	   is SOCK_STREAM. The third parameter is set to 0 for user
 	   applications.
 	*/
-	if ((sockfd = my_socket(AF_INET, SOCK_MyTCP, 0)) < 0) {
+	if ((sockfd = my_socket(AF_INET, SOCK_MyTCP, 0)) < 0)
+	{
 		perror("Cannot create socket\n");
 		exit(0);
 	}
 
 	/* The structure "sockaddr_in" is defined in <netinet/in.h> for the
 	   internet family of protocols. This has three main fields. The
- 	   field "sin_family" specifies the family and is therefore AF_INET
+	   field "sin_family" specifies the family and is therefore AF_INET
 	   for the internet family. The field "sin_addr" specifies the
 	   internet address of the server. This field is set to INADDR_ANY
 	   for machines having a single IP address. The field "sin_port"
 	   specifies the port number of the server.
 	*/
-	serv_addr.sin_family		= AF_INET;
-	serv_addr.sin_addr.s_addr	= INADDR_ANY;
-	serv_addr.sin_port		= htons(PORT);
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons(20000);
 
 	/* With the information provided in serv_addr, we associate the server
-	   with its port using the bind() system call. 
+	   with its port using the bind() system call.
 	*/
-	if (my_bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+	if (my_bind(sockfd, (struct sockaddr *)&serv_addr,
+				sizeof(serv_addr)) < 0)
+	{
 		perror("Unable to bind local address\n");
 		exit(0);
 	}
 
 	my_listen(sockfd, 5); /* This specifies that up to 5 concurrent client
-			      requests will be queued up while the system is
-			      executing the "accept" system call below.
+				  requests will be queued up while the system is
+				  executing the "accept" system call below.
 			   */
 
 	/* In this program we are illustrating an iterative server -- one
@@ -70,7 +76,8 @@ int main()
 	   communication is over, the process comes back to wait again on
 	   the original socket descriptor.
 	*/
-	while (1) {
+	while (1)
+	{
 
 		/* The accept() system call accepts a client connection.
 		   It blocks the server until a client request comes.
@@ -82,36 +89,41 @@ int main()
 		   system call is stored in "newsockfd".
 		*/
 		clilen = sizeof(cli_addr);
-		newsockfd = my_accept(sockfd, (struct sockaddr *)&cli_addr, clilen);
+		newsockfd = my_accept(sockfd, (struct sockaddr *)&cli_addr,
+							  &clilen);
 
-		if (newsockfd < 0) {
+		if (newsockfd < 0)
+		{
 			perror("Accept error\n");
 			exit(0);
 		}
 
-
 		/* We initialize the buffer, copy the message to it,
-			and send the message to the client. 
+			and send the message to the client.
 		*/
-		
-		strcpy(buf,"Message from server");
-		send(newsockfd, buf, 100, 0);
+		for (int i = 0; i < 100; i++)
+		{
+			my_recv(newsockfd, buf, 100, 0);
+			printf("%d: %s\n", i, buf);
+			for (int i = 0; i < 100; i++)
+				buf[i] = '\0';
+		}
+		my_recv(newsockfd, buf, 100, 0);
+		printf("100: %s\n", buf);
+		sleep(1);
+		strcpy(buf, "Message from server");
+		my_send(newsockfd, buf, 100, 0);
 		/* We now receive a message from the client. For this example
-  		   we make an assumption that the entire message sent from the
-  		   client will come together. In general, this need not be true
+		   we make an assumption that the entire message sent from the
+		   client will come together. In general, this need not be true
 		   for TCP sockets (unlike UDPi sockets), and this program may not
-		   always work (for this example, the chance is very low as the 
+		   always work (for this example, the chance is very low as the
 		   message is very short. But in general, there has to be some
-	   	   mechanism for the receiving side to know when the entire message
+		   mechanism for the receiving side to know when the entire message
 		  is received. Look up the return value of recv() to see how you
 		  can do this.
-		*/ 
-		// my_recv(newsockfd, buf, 100, 0);
-		printf("%s\n", buf);
+		*/
 		my_close(newsockfd);
 	}
-	my_close(sockfd);
 	return 0;
 }
-			
-
