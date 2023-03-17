@@ -1,0 +1,44 @@
+The given code is an implementation of a simple client-server communication using TCP/IP sockets. The client and server communicate by exchanging messages through a socket connection. 
+When a my_send call is made, the client sends a message to the server, and when a my_recv call is made, the client receives a message from the server.
+
+When a my_send call is made, the following happens:
+The client prepares the message to be sent by converting the input data into a byte stream.
+The client sends the message through the socket connection to the server using the sendall() function.
+The sendall() function sends the entire message, blocking until all the data has been sent or an error occurs.
+Once the message has been sent, the client returns from the my_send call.
+
+When a my_recv call is made, the following happens:
+The client waits to receive a message from the server through the socket connection using the recv() function.
+The recv() function receives the message, blocking until the message is complete or an error occurs.
+The client processes the received message by converting the byte stream back into the original data format.
+The client returns the received data to the calling function.
+The my_send and my_recv functions themselves do not use any tables. 
+However, the communication between the client and server involves the use of two tables - the server socket table and the client socket table.
+The server socket table is created by the server when it starts listening for incoming connections. This table contains information about the server socket, such as its IP address and port number. 
+When a client connects to the server, the server creates a new entry in the server socket table to keep track of the new connection.
+The client socket table is created by the client when it connects to the server. This table contains information about the client socket, such as its IP address and port number. 
+When the client sends or receives data through the socket connection, the client socket table is used to determine the destination or source of the data.
+
+In summary, the my_send and my_recv functions are responsible for sending and receiving messages between the client and server using TCP/IP sockets. 
+The communication between the client and server involves the use of two tables - the server socket table and the client socket table.
+The sendall() and recv() functions are used to send and receive messages, respectively, while the my_send and my_recv functions handle the conversion of data into byte streams and back again.
+
+The four functions, create_Received_Message, create_Send_Message, add_Received_Message, and add_Send_Message are all involved in the communication process between two nodes. 
+These functions help to create, add, and manipulate the messages that are sent and received during the communication process.
+
+The create_Received_Message function is used to create a new message that has been received by a node. 
+This function takes in the message data as an argument and creates a new ReceivedMessage object. The ReceivedMessage object stores the message data as well as metadata such as the sender's address and the time the message was received.
+
+The create_Send_Message function is used to create a new message that is to be sent by a node. This function takes in the message data and the recipient's address as arguments and creates a new SendMessage object. 
+The SendMessage object stores the message data as well as the recipient's address.
+
+The add_Received_Message function is used to add a ReceivedMessage object to a list of messages that have been received by a node. 
+This function takes in the ReceivedMessage object and the list of received messages as arguments and appends the new message to the list.
+
+The add_Send_Message function is used to add a SendMessage object to a list of messages that are to be sent by a node. 
+This function takes in the SendMessage object and the list of messages to be sent as arguments and appends the new message to the list.
+
+These functions work together to facilitate communication between nodes. When a message is received, the create_Received_Message function is called to create a ReceivedMessage object with the message data and metadata. 
+The add_Received_Message function is then called to add the new ReceivedMessage object to the list of received messages.
+When a node wants to send a message, the create_Send_Message function is called to create a SendMessage object with the message data and recipient's address. 
+The add_Send_Message function is then called to add the new SendMessage object to the list of messages to be sent.
