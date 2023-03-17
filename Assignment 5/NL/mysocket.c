@@ -1,7 +1,7 @@
 /**
  * @file mysocket.c
  * Hardik Soni 20CS30023
- * Archit Mangrulkar
+ * Archit Mangrulkar 20CS10086
  */
 #include "mysocket.h"
 
