@@ -309,7 +309,6 @@ void *sendThread(void *arg)
     {
         // Sleep for 0.2 seconds (200000 microseconds)
         usleep(200000);
-        // sleep(T);
         if (connectionStatus == 0)
             continue;
         int sockfd = mySocketfd;
