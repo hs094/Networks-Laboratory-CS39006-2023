@@ -1,0 +1,42 @@
+# note: to compile a program with this library, you need to link the 
+# libmysocket library, as well as the pthread library 
+# eg: gcc main.c libmysocket.a -pthread
+
+In this assignment we have used 2 data structures for the
+send and receive tables. 
+both these data structures essentially implement buffers as
+circular queues. the variable 'used' denotes the current size of the 
+buffer. send_in and send_out denote the in and out locations of the 
+queue. we have set the max size of a single message in the queue
+as 5000 as per the our understanding of the question.
+
+In our implementation, we have made the my_send and my_recv calls
+interact only with the buffers. The R and S threads wait on the 
+relevant changes to their buffers and actually make the 
+send and recv calls. my_recv reads from the received buffer and 
+copies it to the string that is passed to it. my_send adds what we 
+wish to send to the send buffer. This is then actually sent through 
+the socket by the S thread. Likewise the R thread receives and populates
+the received buffer.
+
+When a driver program calls my_recv, it starts looking through the
+received buffer and returns the string through a pointer arg.
+However, notice that the R thread is already waiting
+on recv calls, and adds to buffer as and when it gets them.
+Similarly when a driver program calls my_send, it adds to the send
+buffer. This then gets sent at the timeout when the S thread
+finds the buffer to be no longer empty
+
+We do some additional book-keeping within R and S threads to ensure 
+that the entire message is send, received and assimilated
+while sending a message, we first send the length of the message
+We do this by encoding it in the first 2 bytes as 2 characters
+(consider it as a number base 256). Clearly, we only need 2 bytes
+since the max message size is specified.
+
+Later while receiving, we don't stop until we have covered the 
+required number of bytes. This ensures that the entire message is 
+send and received reliably in one my_recv call. 
+
+Currrently we have set the timeout of the the program to 1 sec, meaning
+send periodically checks every second for changes in the send table
