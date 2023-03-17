@@ -237,7 +237,6 @@ void *sendThread(void *arg)
 {
     for (; 1;)
     {
-        // Sleep for 0.2 seconds (200000 microseconds)
         sleep(1);
         if (connectionStatus == 0)
             continue;

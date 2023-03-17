@@ -72,7 +72,7 @@ int main()
 	// 	bzero(buf, 100);
 	// }
 	my_recv(sockfd, buf, strlen(buf), 0);
-	printf("100: %s\n", i, buf);
+	printf("100: %s\n", buf);
 	printf("[%s]\n", buf);
 	my_close(sockfd);
 	return 0;
