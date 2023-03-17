@@ -10,6 +10,10 @@
 #define T 2
 #define P 0.05
 #define TIMEOUT (2 * T)
+#define MAX_QUEUE_SIZE 10
+#define MAX_ONE 1000
+#define MAX_MSG 5000
+
 
 extern int tot_transm;
 

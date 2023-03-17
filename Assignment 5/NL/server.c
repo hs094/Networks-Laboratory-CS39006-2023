@@ -104,15 +104,15 @@ int main()
 		for (int i = 0; i < 100; i++)
 		{
 			my_recv(newsockfd, buf, 100, 0);
-			printf("%s\n", buf);
+			printf("%d: %s\n", i, buf);
 			for (int i = 0; i < 100; i++)
 				buf[i] = '\0';
 		}
 		my_recv(newsockfd, buf, 100, 0);
-		printf("%s\n", buf);
+		printf("100: %s\n", buf);
+		sleep(1);
 		strcpy(buf, "Message from server");
-		my_send(newsockfd, buf, strlen(buf) + 1, 0);
-
+		my_send(newsockfd, buf, 100, 0);
 		/* We now receive a message from the client. For this example
 		   we make an assumption that the entire message sent from the
 		   client will come together. In general, this need not be true
@@ -123,7 +123,6 @@ int main()
 		  is received. Look up the return value of recv() to see how you
 		  can do this.
 		*/
-
 		my_close(newsockfd);
 	}
 	return 0;
