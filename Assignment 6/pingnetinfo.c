@@ -41,6 +41,7 @@ $] sudo ./tr www.iitkgp.ac.in
 #define MAX_HOP 64
 #define DEST_PORT 32164
 #define S_PORT 8080
+#define WAIT_D 0.01
 
 int TIMEOUT = 1;
 int rawfd1, rawfd2;
@@ -71,10 +72,16 @@ bool isNumber(char number[], int *p)
     }
     return true;
 }
-/* Function to generate random string */
-void gen(char *dst)
+
+int min(int a, int b)
 {
-    for (int i = 0; i < N; i++)
+    return a > b ? b : a;
+}
+
+/* Function to generate random string */
+void gen(char *dst, int len)
+{
+    for (int i = 0; i < min(N, len); i++)
     {
         dst[i] = rand() % 26 + 'A';
     }
@@ -135,7 +142,7 @@ void form_socket(char s[])
         }
     }
 }
-void sendICMP(int ttl, char buffer[], char payload[])
+void sendICMP(int ttl, char buffer[], char payload[], int sz)
 {
     /* 5. Generate UPD and IP header */
     ip->ihl = 5;
@@ -166,6 +173,20 @@ void sendICMP(int ttl, char buffer[], char payload[])
         close(rawfd2);
         exit(EXIT_FAILURE);
     }
+}
+float computeBandWidth(int ttl, char buffer[], char payload[])
+{
+    int len = rand() % N + 1;
+    gen(payload, len);
+    memset(buffer, 0, PCKT_LEN);
+    sendICMP(ttl, buffer, payload, N);
+    clock_t start_time = clock();
+    char msg[MAX_CHAR];
+    int msglen;
+    socklen_t raddr_len = sizeof(saddr_raw);
+    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0) ;
+    clock_t end_time = clock();
+    return (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000;
 }
 int main(int argc, char *argv[])
 {
@@ -235,7 +256,7 @@ int main(int argc, char *argv[])
     }
 
     SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, MAX_HOP, N);
-    INFO("TTL \tIPv4 Address \tResponse Time \tLatency \tBandwidth");
+    INFO("TTL\tIPv4 Address\tResponse_Time\tLatency\t\tBandwidth");
     cli_addr.sin_family = AF_INET;
     cli_addr.sin_port = htons(dst_port);
     cli_addr.sin_addr.s_addr = dst_addr;
@@ -265,9 +286,9 @@ int main(int argc, char *argv[])
         {
             /* 4. generate Payload */
             times++;
-            gen(payload);
+            gen(payload, N);
             memset(buffer, 0, PCKT_LEN);
-            sendICMP(ttl, buffer, payload);
+            sendICMP(ttl, buffer, payload, N);
             start_time = clock();
         }
         /* 7. Wait on select call */
@@ -309,20 +330,38 @@ int main(int argc, char *argv[])
                 saddr_ip.s_addr = hdrip.saddr;
                 if (hdrip.protocol == 1) // ICMP
                 {
+                    // Sending for Latency a Message of Size Zero
+                    memset(payload, 0, N);
+                    memset(buffer, 0, PCKT_LEN);
+                    sendICMP(ttl, buffer, payload, 0);
+                    clock_t start_time_laten = clock();
                     if (hdricmp.type == 3)
                     {
                         // verify
-
-                        if (hdrip.saddr == ip->daddr)
-                            printf("%d\t%s\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000);
-                        close(rawfd1);
-                        close(rawfd2);
-                        exit(EXIT_SUCCESS);
+                        // Calculating Latency
+                        if (FD_ISSET(rawfd2, &readSockSet))
+                        {
+                            raddr_len = sizeof(saddr_raw);
+                            while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
+                                ;
+                            clock_t end_time_laten = clock();
+                            float bd = computeBandWidth(ttl, buffer, payload);
+                            if (hdrip.saddr == ip->daddr)
+                                printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
+                            close(rawfd1);
+                            close(rawfd2);
+                            exit(EXIT_SUCCESS);
+                        }
                     }
                     else if (hdricmp.type == 11)
                     {
                         // time exceed
-                        printf("%d\t%s\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000);
+                        raddr_len = sizeof(saddr_raw);
+                        while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
+                            ;
+                        clock_t end_time_laten = clock();
+                        float bd = computeBandWidth(ttl, buffer, payload);
+                        printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
                         ttl++;
                         times = 1;
                         timeout = TIMEOUT;
@@ -336,7 +375,7 @@ int main(int argc, char *argv[])
                     //  printf("ignore\n");
                     is_send = 0;
                     timeout = end_time - start_time;
-                    if (timeout >= 0.01)
+                    if (timeout >= WAIT_D)
                         continue;
                     else
                     {
@@ -355,7 +394,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-            // timeou
+            // timeout
             if (times > 3)
             {
                 printf("%d\t*\t*\n", ttl);
