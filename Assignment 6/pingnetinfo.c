@@ -176,7 +176,9 @@ void sendICMP(int ttl, char buffer[], char payload[], int sz)
 }
 float computeBandWidth(int ttl, char buffer[], char payload[])
 {
+    srand(100);
     int len = rand() % N + 1;
+    memset(payload, 0, N);
     gen(payload, len);
     memset(buffer, 0, PCKT_LEN);
     sendICMP(ttl, buffer, payload, N);
@@ -184,7 +186,14 @@ float computeBandWidth(int ttl, char buffer[], char payload[])
     char msg[MAX_CHAR];
     int msglen;
     socklen_t raddr_len = sizeof(saddr_raw);
-    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0) ;
+    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0);
+    len = rand() % N + 1;
+    memset(payload, 0, N);
+    gen(payload, len);
+    memset(buffer, 0, PCKT_LEN);
+    sendICMP(ttl, buffer, payload, N);
+    raddr_len = sizeof(saddr_raw);
+    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0);
     clock_t end_time = clock();
     return (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000;
 }
@@ -255,7 +264,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, MAX_HOP, N);
+    SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, min(MAX_HOP, max_hops), N);
     INFO("TTL\tIPv4 Address\tResponse_Time\tLatency\t\tBandwidth");
     cli_addr.sin_family = AF_INET;
     cli_addr.sin_port = htons(dst_port);
@@ -277,7 +286,7 @@ int main(int argc, char *argv[])
     clock_t start_time;
     while (1)
     {
-        if (ttl >= 64)
+        if (ttl >= min(max_hops, MAX_HOP))
             break;
         char buffer[PCKT_LEN];
         ip = (struct iphdr *)buffer;
@@ -381,7 +390,7 @@ int main(int argc, char *argv[])
                     {
                         if (times > 3)
                         {
-                            printf("%d\t*\t*\n", ttl);
+                            printf("%d\t*\t*   \t*   \t*   \n", ttl);
                             times = 1;
                             ttl++;
                         }
@@ -397,7 +406,7 @@ int main(int argc, char *argv[])
             // timeout
             if (times > 3)
             {
-                printf("%d\t*\t*\n", ttl);
+                printf("%d\t*\t*\t*\t*\n", ttl);
                 times = 1;
                 ttl++;
             }
