@@ -47,7 +47,7 @@ int TIMEOUT = 1;
 int rawfd1, rawfd2;
 struct sockaddr_in saddr_raw, cli_addr;
 socklen_t saddr_raw_len;
-char buf[100];
+char buf[100], payload[52], ipaddr[MAX_CHAR];
 u_int16_t src_port, dst_port;
 u_int32_t dst_addr;
 struct iphdr *ip;
@@ -174,6 +174,57 @@ void sendICMP(int ttl, char buffer[], char payload[], int sz)
         exit(EXIT_FAILURE);
     }
 }
+void networkICMP(char* argv[])
+{
+    if ((rawfd1 = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
+    {
+        perror("Socket error");
+        exit(EXIT_FAILURE);
+    }
+    if ((rawfd2 = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0)
+    {
+        perror("Socket error");
+        exit(EXIT_FAILURE);
+    }
+
+    /* 2. get the destination IP */
+    if (hostname_to_ip(argv[1], ipaddr) != 0)
+    {
+        close(rawfd1);
+        close(rawfd2);
+        exit(EXIT_FAILURE);
+    }
+
+    dst_addr = inet_addr(ipaddr);
+    src_port = S_PORT;
+    dst_port = DEST_PORT;
+    saddr_raw.sin_family = AF_INET;
+    saddr_raw.sin_port = htons(src_port);
+    saddr_raw.sin_addr.s_addr = INADDR_ANY; // inet_addr(LISTEN_IP);
+    saddr_raw_len = sizeof(saddr_raw);
+    /* 3. Bind the Sockets */
+    if (bind(rawfd1, (struct sockaddr *)&saddr_raw, saddr_raw_len) < 0)
+    {
+        perror("raw bind");
+        close(rawfd1);
+        close(rawfd2);
+        exit(1);
+    }
+
+    cli_addr.sin_family = AF_INET;
+    cli_addr.sin_port = htons(dst_port);
+    cli_addr.sin_addr.s_addr = dst_addr;
+
+    int one = 1;
+    const int *val = &one;
+    if (setsockopt(rawfd1, IPPROTO_IP, IP_HDRINCL, val, sizeof(one)) < 0)
+    {
+        fprintf(stderr, "Error: setsockopt. You need to run this program as root\n");
+        close(rawfd1);
+        close(rawfd2);
+        exit(EXIT_FAILURE);
+    }
+}
 float computeBandWidth(int ttl, char buffer[], char payload[])
 {
     srand(100);
@@ -221,69 +272,16 @@ int main(int argc, char *argv[])
     }
 
     TIMEOUT = *p;
-    // bzero(buf,0);
-    // strcpy(buf, "IPPROTO_UDP");
-    // form_socket(buf);
-    // bzero(buf,0);
-    // strcpy(buf, "IPPROTO_ICMP");
-    // form_socket(buf);
-    // /* 1. Create two Raw Socket */
-    if ((rawfd1 = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
-    {
-        perror("Socket error");
-        exit(EXIT_FAILURE);
-    }
-    if ((rawfd2 = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0)
-    {
-        perror("Socket error");
-        exit(EXIT_FAILURE);
-    }
+    networkICMP(argv);
 
-    /* 2. get the destination IP */
-    char ipaddr[MAX_CHAR];
-    if (hostname_to_ip(argv[1], ipaddr) != 0)
-    {
-        close(rawfd1);
-        close(rawfd2);
-        exit(EXIT_FAILURE);
-    }
-
-    dst_addr = inet_addr(ipaddr);
-    src_port = S_PORT;
-    dst_port = DEST_PORT;
-    saddr_raw.sin_family = AF_INET;
-    saddr_raw.sin_port = htons(src_port);
-    saddr_raw.sin_addr.s_addr = INADDR_ANY; // inet_addr(LISTEN_IP);
-    saddr_raw_len = sizeof(saddr_raw);
-    /* 3. Bind the Sockets */
-    if (bind(rawfd1, (struct sockaddr *)&saddr_raw, saddr_raw_len) < 0)
-    {
-        perror("raw bind");
-        close(rawfd1);
-        close(rawfd2);
-        exit(1);
-    }
-
-    SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, min(MAX_HOP, max_hops), N);
-    INFO("TTL\tIPv4 Address\tResponse_Time\tLatency\t\tBandwidth");
-    cli_addr.sin_family = AF_INET;
-    cli_addr.sin_port = htons(dst_port);
-    cli_addr.sin_addr.s_addr = dst_addr;
-
-    int one = 1;
-    const int *val = &one;
-    if (setsockopt(rawfd1, IPPROTO_IP, IP_HDRINCL, val, sizeof(one)) < 0)
-    {
-        fprintf(stderr, "Error: setsockopt. You need to run this program as root\n");
-        close(rawfd1);
-        close(rawfd2);
-        exit(EXIT_FAILURE);
-    }
     int ttl = 1, timeout = TIMEOUT, is_send = 1;
     fd_set readSockSet;
     int times = 0;
-    char payload[52];
     clock_t start_time;
+    
+    SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, min(MAX_HOP, max_hops), N);
+    INFO("TTL\tIPv4 Address\tResponse_Time\tLatency\t\tBandwidth");
+
     while (1)
     {
         if (ttl >= min(max_hops, MAX_HOP))
