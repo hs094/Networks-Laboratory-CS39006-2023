@@ -1,18 +1,18 @@
 
 /*
-      Author:- 
-	Hardik Soni
-	20CS30023 
+      Author:-
+    Hardik Soni
+    20CS30023
 */
-
 
 /* How to RUN:
 $] gcc pingnetinfo.c -o tr
-$] sudo ./tr www.iitkgp.ac.in 
+$] sudo ./tr www.iitkgp.ac.in
 
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -29,15 +29,48 @@ $] sudo ./tr www.iitkgp.ac.in
 #include <fcntl.h>
 #include <time.h>
 
+#define ERROR(msg, ...) printf("\033[1;31m[ERROR] " msg " \033[0m\n", ##__VA_ARGS__);
+#define SUCCESS(msg, ...) printf("\033[1;36m[PING] " msg " \033[0m\n", ##__VA_ARGS__);
+#define INFO(msg, ...) printf("\033[1;34m" msg " \033[0m\n", ##__VA_ARGS__);
+#define DEBUG(msg, ...) printf("\033[1;32m[DEBUG] " msg "\033[0m", ##__VA_ARGS__);
+
 #define N 52
 #define MSG_SIZE 2048
 #define MAX_CHAR 100
 #define PCKT_LEN 8192
-#define TIMEOUT 1
 #define MAX_HOP 64
 #define DEST_PORT 32164
 #define S_PORT 8080
 
+int TIMEOUT = 1;
+int rawfd1, rawfd2;
+struct sockaddr_in saddr_raw, cli_addr;
+socklen_t saddr_raw_len;
+char buf[100];
+u_int16_t src_port, dst_port;
+u_int32_t dst_addr;
+struct iphdr *ip;
+struct udphdr *udp;
+
+void print_Usage_Error(char *name)
+{
+    ERROR("Error: Invalid parameters!\n");
+    ERROR("Usage: sudo %s [-IP] [-n] [-T]\n", name);
+    ERROR("Where:- \n\t-> IP:- IP Address in IPv4\n\t-> n:- the number of times a probe will be sent per link\n\t-> T:- the time difference between any two probes.\n");
+}
+
+bool isNumber(char number[], int *p)
+{
+    int i = 0;
+    *p = 0;
+    for (; i < strlen(number); i++)
+    {
+        if (number[i] > '9' || number[i] < '0')
+            return false;
+        *p = *p * 10 + (number[i] - '0');
+    }
+    return true;
+}
 /* Function to generate random string */
 void gen(char *dst)
 {
@@ -45,10 +78,10 @@ void gen(char *dst)
     {
         dst[i] = rand() % 26 + 'A';
     }
-    dst[N-1] = '\0';
+    dst[N - 1] = '\0';
 }
 
-/*The IPv4 layer generates an IP header when sending a packet unless the IP_HDRINCL socket option is enabled on the socket. 
+/*The IPv4 layer generates an IP header when sending a packet unless the IP_HDRINCL socket option is enabled on the socket.
 When it is enabled, the packet must contain an IP header.*/
 
 /* Function to find IP  */
@@ -83,48 +116,114 @@ unsigned short csum(unsigned short *buf, int nwords)
     return (unsigned short)(~sum);
 }
 
+void form_socket(char s[])
+{
+    if (strcmp(s, "IPPROTO_UDP") == 0)
+    {
+        if ((rawfd1 = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
+        {
+            perror("Socket error");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else if (strcmp(s, "IPPROTO_ICMP"))
+    {
+        if ((rawfd2 = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0)
+        {
+            perror("Socket error");
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+void sendICMP(int ttl, char buffer[], char payload[])
+{
+    /* 5. Generate UPD and IP header */
+    ip->ihl = 5;
+    ip->version = 4;
+    ip->tos = 0;                                                    // low delay
+    ip->tot_len = sizeof(struct iphdr) + sizeof(struct udphdr) + N; // https://tools.ietf.org/html/rfc791#page-11
+    ip->id = htons(54322);
+    ip->ttl = ttl;     // hops
+    ip->protocol = 17; // UDP
+    ip->saddr = 0;     // src_addr;
+    ip->daddr = dst_addr;
+
+    // fabricate the UDP header
+    udp->source = htons(src_port);
+    // destination port number
+    udp->dest = htons(dst_port);
+    udp->len = htons(sizeof(struct udphdr) + N);
+
+    // calculate the checksum for integrity
+    ip->check = csum((unsigned short *)buffer, sizeof(struct iphdr) + sizeof(struct udphdr));
+
+    /* 6. Send the packet */
+    strcpy(buffer + sizeof(struct iphdr) + sizeof(struct udphdr), payload);
+    if (sendto(rawfd1, buffer, ip->tot_len, 0, (struct sockaddr *)&cli_addr, sizeof(cli_addr)) < 0)
+    {
+        perror("sendto()");
+        close(rawfd1);
+        close(rawfd2);
+        exit(EXIT_FAILURE);
+    }
+}
 int main(int argc, char *argv[])
 {
-    int rawfd1, rawfd2;
-    struct sockaddr_in saddr_raw, cli_addr;
-    socklen_t saddr_raw_len;
+    int *p = (int *)malloc(sizeof(int *)), max_hops;
+    if (argc != 4)
+    {
+        print_Usage_Error(argv[0]);
+        exit(EXIT_FAILURE);
+    }
 
-    /* 1. Create two Raw Socket */
+    if (!isNumber(argv[2], p))
+    {
+        ERROR("Could not resolve number of times a probe will be sent per link (n)");
+        exit(EXIT_FAILURE);
+    }
+
+    max_hops = *p;
+
+    if (!isNumber(argv[3], p))
+    {
+        ERROR("Could not resolve the time difference between any two probes (T)");
+        exit(EXIT_FAILURE);
+    }
+
+    TIMEOUT = *p;
+    // bzero(buf,0);
+    // strcpy(buf, "IPPROTO_UDP");
+    // form_socket(buf);
+    // bzero(buf,0);
+    // strcpy(buf, "IPPROTO_ICMP");
+    // form_socket(buf);
+    // /* 1. Create two Raw Socket */
     if ((rawfd1 = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
     {
         perror("Socket error");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if ((rawfd2 = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0)
     {
         perror("Socket error");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
-    if (argc != 2)
-    {
-        printf("Error: Invalid parameters!\n");
-        printf("Usage: %s <target hostname/IP>\n", argv[0]);
-        close(rawfd1);
-        close(rawfd2);
-        exit(1);
-    }
+
     /* 2. get the destination IP */
     char ipaddr[MAX_CHAR];
     if (hostname_to_ip(argv[1], ipaddr) != 0)
     {
         close(rawfd1);
         close(rawfd2);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
-    u_int16_t src_port, dst_port;
-    u_int32_t dst_addr;
     dst_addr = inet_addr(ipaddr);
     src_port = S_PORT;
     dst_port = DEST_PORT;
     saddr_raw.sin_family = AF_INET;
     saddr_raw.sin_port = htons(src_port);
-    saddr_raw.sin_addr.s_addr = INADDR_ANY; //inet_addr(LISTEN_IP);
+    saddr_raw.sin_addr.s_addr = INADDR_ANY; // inet_addr(LISTEN_IP);
     saddr_raw_len = sizeof(saddr_raw);
     /* 3. Bind the Sockets */
     if (bind(rawfd1, (struct sockaddr *)&saddr_raw, saddr_raw_len) < 0)
@@ -135,8 +234,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    printf("PingNetInfo to %s (%s), %d hops max, %d byte packets\n", argv[1], ipaddr, MAX_HOP, N);
-
+    SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, MAX_HOP, N);
+    INFO("TTL \tIPv4 Address \tResponse Time \tLatency \tBandwidth");
     cli_addr.sin_family = AF_INET;
     cli_addr.sin_port = htons(dst_port);
     cli_addr.sin_addr.s_addr = dst_addr;
@@ -148,7 +247,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Error: setsockopt. You need to run this program as root\n");
         close(rawfd1);
         close(rawfd2);
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     int ttl = 1, timeout = TIMEOUT, is_send = 1;
     fd_set readSockSet;
@@ -160,48 +259,16 @@ int main(int argc, char *argv[])
         if (ttl >= 64)
             break;
         char buffer[PCKT_LEN];
-        struct iphdr *ip = (struct iphdr *)buffer;
-        struct udphdr *udp = (struct udphdr *)(buffer + sizeof(struct iphdr));
+        ip = (struct iphdr *)buffer;
+        udp = (struct udphdr *)(buffer + sizeof(struct iphdr));
         if (is_send)
         {
             /* 4. generate Payload */
             times++;
             gen(payload);
             memset(buffer, 0, PCKT_LEN);
-
-            /* 5. Generate UPD and IP header */
-            ip->ihl = 5;
-            ip->version = 4;
-            ip->tos = 0; // low delay
-            ip->tot_len = sizeof(struct iphdr) + sizeof(struct udphdr) + N; //https://tools.ietf.org/html/rfc791#page-11
-            ip->id = htons(54322);
-            ip->ttl = ttl;     // hops
-            ip->protocol = 17; // UDP
-            ip->saddr = 0;     //src_addr;
-            ip->daddr = dst_addr;
-
-            // fabricate the UDP header
-            udp->source = htons(src_port);
-            // destination port number
-            udp->dest = htons(dst_port);
-            udp->len = htons(sizeof(struct udphdr)+N);
-
-            // calculate the checksum for integrity
-            ip->check = csum((unsigned short *)buffer, sizeof(struct iphdr) + sizeof(struct udphdr));
-
-            /* 6. Send the packet */
-            strcpy(buffer + sizeof(struct iphdr) + sizeof(struct udphdr), payload);
-            if (sendto(rawfd1, buffer, ip->tot_len, 0,
-                       (struct sockaddr *)&cli_addr, sizeof(cli_addr)) < 0)
-            {
-                perror("sendto()");
-                close(rawfd1);
-                close(rawfd2);
-                exit(1);
-            }
-            // printf("packet Send %d\n", ttl);
+            sendICMP(ttl, buffer, payload);
             start_time = clock();
-
         }
         /* 7. Wait on select call */
         FD_ZERO(&readSockSet);
@@ -213,7 +280,7 @@ int main(int argc, char *argv[])
             perror("select()\n");
             close(rawfd1);
             close(rawfd2);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         else if (ret)
         {
@@ -240,22 +307,21 @@ int main(int argc, char *argv[])
                 // read the destination IP
                 struct in_addr saddr_ip;
                 saddr_ip.s_addr = hdrip.saddr;
-                if (hdrip.protocol == 1) //ICMP
+                if (hdrip.protocol == 1) // ICMP
                 {
                     if (hdricmp.type == 3)
                     {
                         // verify
+
                         if (hdrip.saddr == ip->daddr)
-                        {
                             printf("%d\t%s\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000);
-                        }
                         close(rawfd1);
                         close(rawfd2);
-                        return 0;
+                        exit(EXIT_SUCCESS);
                     }
                     else if (hdricmp.type == 11)
                     {
-                        //time exceed
+                        // time exceed
                         printf("%d\t%s\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000);
                         ttl++;
                         times = 1;
@@ -266,8 +332,8 @@ int main(int argc, char *argv[])
                 }
                 else
                 {
-                    //Ignore the message
-                    // printf("ignore\n");
+                    // Ignore the message
+                    //  printf("ignore\n");
                     is_send = 0;
                     timeout = end_time - start_time;
                     if (timeout >= 0.01)
@@ -289,8 +355,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-            //timeout
-            // printf("Timeout\n");
+            // timeou
             if (times > 3)
             {
                 printf("%d\t*\t*\n", ttl);
@@ -304,5 +369,5 @@ int main(int argc, char *argv[])
     }
     close(rawfd1);
     close(rawfd2);
-    return 0;
+    exit(EXIT_SUCCESS);
 }
