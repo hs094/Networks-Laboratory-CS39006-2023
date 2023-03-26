@@ -6,8 +6,8 @@
 */
 
 /* How to RUN:
-$] gcc pingnetinfo.c -o tr
-$] sudo ./tr www.iitkgp.ac.in
+$] gcc pingnetinfo.c -o t
+$] sudo ./t www.iitkgp.ac.in 10 3
 
 */
 #include <stdio.h>
