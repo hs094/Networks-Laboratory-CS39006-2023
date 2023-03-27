@@ -34,7 +34,7 @@ $] sudo ./t www.iitkgp.ac.in 10 3
 #define INFO(msg, ...) printf("\033[1;34m" msg " \033[0m\n", ##__VA_ARGS__);
 #define DEBUG(msg, ...) printf("\033[1;32m[DEBUG] " msg "\033[0m", ##__VA_ARGS__);
 
-#define N 52
+#define N 60
 #define MSG_SIZE 2048
 #define MAX_CHAR 100
 #define PCKT_LEN 8192
@@ -174,7 +174,7 @@ void sendICMP(int ttl, char buffer[], char payload[], int sz)
         exit(EXIT_FAILURE);
     }
 }
-void networkICMP(char* argv[])
+void networkICMP(char *argv[])
 {
     if ((rawfd1 = socket(AF_INET, SOCK_RAW, IPPROTO_UDP)) < 0)
     {
@@ -237,14 +237,16 @@ float computeBandWidth(int ttl, char buffer[], char payload[])
     char msg[MAX_CHAR];
     int msglen;
     socklen_t raddr_len = sizeof(saddr_raw);
-    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0);
+    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
+        ;
     len = rand() % N + 1;
     memset(payload, 0, N);
     gen(payload, len);
     memset(buffer, 0, PCKT_LEN);
     sendICMP(ttl, buffer, payload, N);
     raddr_len = sizeof(saddr_raw);
-    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0);
+    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
+        ;
     clock_t end_time = clock();
     return (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000;
 }
@@ -274,11 +276,15 @@ int main(int argc, char *argv[])
     TIMEOUT = *p;
     networkICMP(argv);
 
-    int ttl = 1, timeout = TIMEOUT, is_send = 1;
+    char trim[100];
+    memset(trim, 0, 100);
+    char star[57];
+    memset(star, '*', 56);
+
+    int ttl = 1, timeout = TIMEOUT, is_send = 1, times = 0;
     fd_set readSockSet;
-    int times = 0;
     clock_t start_time;
-    
+
     SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, min(MAX_HOP, max_hops), N);
     INFO("TTL\tIPv4 Address\tResponse_Time\tLatency\t\tBandwidth");
 
@@ -316,7 +322,6 @@ int main(int argc, char *argv[])
             if (FD_ISSET(rawfd2, &readSockSet))
             {
                 /* 8. Read the ICMP Message */
-                // printf("ICMP\n");
                 char msg[MAX_CHAR];
                 int msglen;
                 socklen_t raddr_len = sizeof(saddr_raw);
@@ -388,7 +393,9 @@ int main(int argc, char *argv[])
                     {
                         if (times > 3)
                         {
-                            printf("%d\t*\t*   \t*   \t*   \n", ttl);
+                            memset(trim, 0, 100);
+                            sprintf(trim, "%d\t%s", ttl, star);
+                            printf("%s\n", trim);
                             times = 1;
                             ttl++;
                         }
@@ -404,7 +411,9 @@ int main(int argc, char *argv[])
             // timeout
             if (times > 3)
             {
-                printf("%d\t*\t*\t*\t*\n", ttl);
+                memset(trim, 0, 100);
+                sprintf(trim, "%d\t%s", ttl, star);
+                printf("%s\n", trim);
                 times = 1;
                 ttl++;
             }
