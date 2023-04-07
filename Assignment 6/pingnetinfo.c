@@ -1,7 +1,12 @@
 /*
       Author:-
+<<<<<<< HEAD
         Hardik Soni
         20CS30023
+=======
+    Hardik Soni 20CS30023
+    Archit Mangrulkar 20CS10086
+>>>>>>> 44141c4a4f20bcf60aab7d27ab1e97d5a75fc861
 */
 
 /* How to RUN:
