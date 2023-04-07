@@ -1,8 +1,7 @@
-
 /*
       Author:-
-    Hardik Soni
-    20CS30023
+        Hardik Soni
+        20CS30023
 */
 
 /* How to RUN:
@@ -285,12 +284,12 @@ int main(int argc, char *argv[])
     fd_set readSockSet;
     clock_t start_time;
 
-    SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, min(MAX_HOP, max_hops), N);
+    SUCCESS("PingNetInfo to %s (%s), %d hops max, %d byte packets", argv[1], ipaddr, MAX_HOP, N);
     INFO("TTL\tIPv4 Address\tResponse_Time\tLatency\t\tBandwidth");
 
     while (1)
     {
-        if (ttl >= min(max_hops, MAX_HOP))
+        if (ttl >= MAX_HOP)
             break;
         char buffer[PCKT_LEN];
         ip = (struct iphdr *)buffer;
