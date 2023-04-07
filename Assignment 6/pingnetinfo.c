@@ -1,8 +1,8 @@
 
 /*
       Author:-
-    Hardik Soni
-    20CS30023
+    Hardik Soni 20CS30023
+    Archit Mangrulkar 20CS10086
 */
 
 /* How to RUN:
