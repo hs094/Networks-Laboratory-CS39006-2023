@@ -1,12 +1,7 @@
 /*
       Author:-
-<<<<<<< HEAD
-        Hardik Soni
-        20CS30023
-=======
     Hardik Soni 20CS30023
     Archit Mangrulkar 20CS10086
->>>>>>> 44141c4a4f20bcf60aab7d27ab1e97d5a75fc861
 */
 
 /* How to RUN:
@@ -46,8 +41,9 @@ $] sudo ./t www.iitkgp.ac.in 10 3
 #define DEST_PORT 32164
 #define S_PORT 8080
 #define WAIT_D 0.01
+#define TIMEOUT 1
 
-int TIMEOUT = 1;
+// int TIMEOUT = 1;
 int rawfd1, rawfd2;
 struct sockaddr_in saddr_raw, cli_addr;
 socklen_t saddr_raw_len;
@@ -146,7 +142,7 @@ void form_socket(char s[])
         }
     }
 }
-void sendICMP(int ttl, char buffer[], char payload[], int sz)
+clock_t sendICMP(int ttl, char buffer[], char payload[], int sz)
 {
     /* 5. Generate UPD and IP header */
     ip->ihl = 5;
@@ -177,6 +173,7 @@ void sendICMP(int ttl, char buffer[], char payload[], int sz)
         close(rawfd2);
         exit(EXIT_FAILURE);
     }
+    return clock();
 }
 void networkICMP(char *argv[])
 {
@@ -229,33 +226,46 @@ void networkICMP(char *argv[])
         exit(EXIT_FAILURE);
     }
 }
-float computeBandWidth(int ttl, char buffer[], char payload[])
+double val(double a, double b)
 {
-    srand(100);
-    int len = rand() % N + 1;
+    a = a - b;
+    if (a < 0)
+        a = -a;
+    return a;
+}
+double computeBandWidth(int ttl, char buffer[], char payload[])
+{
+
+    int len1 = rand() % N + 1;
     memset(payload, 0, N);
-    gen(payload, len);
+    gen(payload, len1);
     memset(buffer, 0, PCKT_LEN);
     sendICMP(ttl, buffer, payload, N);
-    clock_t start_time = clock();
+    clock_t start_time1 = clock();
     char msg[MAX_CHAR];
     int msglen;
     socklen_t raddr_len = sizeof(saddr_raw);
     while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
         ;
-    len = rand() % N + 1;
+    clock_t end_time1 = clock();
+    int len2 = rand() % N + 1;
     memset(payload, 0, N);
-    gen(payload, len);
+    gen(payload, len2);
     memset(buffer, 0, PCKT_LEN);
     sendICMP(ttl, buffer, payload, N);
+    clock_t start_time2 = clock();
     raddr_len = sizeof(saddr_raw);
     while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
         ;
-    clock_t end_time = clock();
-    return (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000;
+    clock_t end_time2 = clock();
+    double val1 = 1000000 * (difftime(end_time1, start_time1) / (double)CLOCKS_PER_SEC);
+    double val2 = 1000000 * (difftime(end_time2, start_time2) / (double)CLOCKS_PER_SEC);
+    double val3 = 2.0 * abs(len2 - len1);
+    return val3 / val(val1, val2);
 }
 int main(int argc, char *argv[])
 {
+    srand(100);
     int *p = (int *)malloc(sizeof(int *)), max_hops;
     if (argc != 4)
     {
@@ -277,7 +287,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    TIMEOUT = *p;
+    int T = *p;
     networkICMP(argv);
 
     char trim[100];
@@ -361,9 +371,18 @@ int main(int argc, char *argv[])
                             while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
                                 ;
                             clock_t end_time_laten = clock();
-                            float bd = computeBandWidth(ttl, buffer, payload);
+                            double bd = computeBandWidth(ttl, buffer, payload);
                             if (hdrip.saddr == ip->daddr)
-                                printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
+                            {
+                                if (ttl == 1)
+                                {
+                                    printf("%d\t%s\t%.3f ms\t%.3f ms\t----- ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
+                                }
+                                else
+                                {
+                                    printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
+                                }
+                            }
                             close(rawfd1);
                             close(rawfd2);
                             exit(EXIT_SUCCESS);
@@ -376,8 +395,15 @@ int main(int argc, char *argv[])
                         while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
                             ;
                         clock_t end_time_laten = clock();
-                        float bd = computeBandWidth(ttl, buffer, payload);
-                        printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
+                        double bd = computeBandWidth(ttl, buffer, payload);
+                        if (ttl == 1)
+                        {
+                            printf("%d\t%s\t%.3f ms\t%.3f ms\t----- ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
+                        }
+                        else
+                        {
+                            printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
+                        }
                         ttl++;
                         times = 1;
                         timeout = TIMEOUT;
