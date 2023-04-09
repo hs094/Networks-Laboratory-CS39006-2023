@@ -44,7 +44,7 @@ $] sudo ./t www.iitkgp.ac.in 10 3
 #define TIMEOUT 1
 
 // int TIMEOUT = 1;
-int rawfd1, rawfd2;
+int rawfd1, rawfd2, probe, time_probe;
 struct sockaddr_in saddr_raw, cli_addr;
 socklen_t saddr_raw_len;
 char buf[100], payload[52], ipaddr[MAX_CHAR];
@@ -233,40 +233,75 @@ double val(double a, double b)
         a = -a;
     return a;
 }
-double computeBandWidth(int ttl, char buffer[], char payload[])
+double computeBandWidth(int ttl, char buffer[], char payload[], double last_bd)
 {
-
-    int len1 = rand() % N + 1;
-    memset(payload, 0, N);
-    gen(payload, len1);
-    memset(buffer, 0, PCKT_LEN);
-    sendICMP(ttl, buffer, payload, N);
-    clock_t start_time1 = clock();
-    char msg[MAX_CHAR];
-    int msglen;
-    socklen_t raddr_len = sizeof(saddr_raw);
-    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
-        ;
-    clock_t end_time1 = clock();
-    int len2 = rand() % N + 1;
-    memset(payload, 0, N);
-    gen(payload, len2);
-    memset(buffer, 0, PCKT_LEN);
-    sendICMP(ttl, buffer, payload, N);
-    clock_t start_time2 = clock();
-    raddr_len = sizeof(saddr_raw);
-    while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
-        ;
-    clock_t end_time2 = clock();
-    double val1 = 1000000 * (difftime(end_time1, start_time1) / (double)CLOCKS_PER_SEC);
-    double val2 = 1000000 * (difftime(end_time2, start_time2) / (double)CLOCKS_PER_SEC);
-    double val3 = 2.0 * abs(len2 - len1);
-    return val3 / val(val1, val2);
+    double time = 0.0;
+    for (int i = 0; i < probe; i++)
+    {
+        int len1 = rand() % N + 1;
+        memset(payload, 0, N);
+        gen(payload, len1);
+        memset(buffer, 0, PCKT_LEN);
+        sendICMP(ttl, buffer, payload, N);
+        clock_t start_time1 = clock();
+        char msg[MAX_CHAR];
+        int msglen;
+        socklen_t raddr_len = sizeof(saddr_raw);
+        while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
+            ;
+        clock_t end_time1 = clock();
+        int len2 = rand() % N + 1;
+        memset(payload, 0, N);
+        gen(payload, len2);
+        memset(buffer, 0, PCKT_LEN);
+        sendICMP(ttl, buffer, payload, N);
+        clock_t start_time2 = clock();
+        raddr_len = sizeof(saddr_raw);
+        while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
+            ;
+        clock_t end_time2 = clock();
+        double val1 = 1000.0 * ((double)(end_time1 - start_time1) / (double)CLOCKS_PER_SEC);
+        double val2 = 1000.0 * ((double)(end_time2 - start_time2) / (double)CLOCKS_PER_SEC);
+        double val3 = 2.0 * abs(len2 + len1);
+        time += val3 / (val1 + val2);
+        sleep(time_probe);
+    }
+    time /= probe;
+    time -= probe;
+    return time;
 }
+double computeLatency(int ttl, char buffer[], char payload[], double last_laten)
+{
+    // Calculating Latency
+    // Sending for Latency a Message of Size Zero
+    double time = 0;
+    char msg[MAX_CHAR];
+    int raddr_len, msglen;
+    for (int i = 0; i < probe; i++)
+    {
+        memset(payload, 0, N);
+        memset(buffer, 0, PCKT_LEN);
+        gen(payload, 0);
+        sendICMP(ttl, buffer, payload, 0);
+        clock_t start_time_laten = clock();
+        raddr_len = sizeof(saddr_raw);
+        while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
+            ;
+        clock_t end_time_laten = clock();
+        time += 1000 * (((double)(end_time_laten - start_time_laten)) / CLOCKS_PER_SEC);
+        sleep(time_probe);
+    }
+    time /= probe;
+    // printf("%f %f\n", last_laten, time);
+    // time -= last_laten;
+    // printf("Latency:- %f\n", time);
+    return time;
+}
+
 int main(int argc, char *argv[])
 {
     srand(100);
-    int *p = (int *)malloc(sizeof(int *)), max_hops;
+    int *p = (int *)malloc(sizeof(int *));
     if (argc != 4)
     {
         print_Usage_Error(argv[0]);
@@ -279,7 +314,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    max_hops = *p;
+    probe = *p;
 
     if (!isNumber(argv[3], p))
     {
@@ -287,7 +322,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    int T = *p;
+    time_probe = *p;
     networkICMP(argv);
 
     char trim[100];
@@ -296,6 +331,7 @@ int main(int argc, char *argv[])
     memset(star, '*', 56);
 
     int ttl = 1, timeout = TIMEOUT, is_send = 1, times = 0;
+    double bd = 0.0, ln = 0.0;
     fd_set readSockSet;
     clock_t start_time;
 
@@ -357,31 +393,21 @@ int main(int argc, char *argv[])
                 if (hdrip.protocol == 1) // ICMP
                 {
                     // Sending for Latency a Message of Size Zero
-                    memset(payload, 0, N);
-                    memset(buffer, 0, PCKT_LEN);
-                    sendICMP(ttl, buffer, payload, 0);
-                    clock_t start_time_laten = clock();
+                    // memset(payload, 0, N);
+                    // memset(buffer, 0, PCKT_LEN);
+                    // sendICMP(ttl, buffer, payload, 0);
+                    // clock_t start_time_laten = clock();
                     if (hdricmp.type == 3)
                     {
                         // verify
                         // Calculating Latency
                         if (FD_ISSET(rawfd2, &readSockSet))
                         {
-                            raddr_len = sizeof(saddr_raw);
-                            while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
-                                ;
-                            clock_t end_time_laten = clock();
-                            double bd = computeBandWidth(ttl, buffer, payload);
+                            ln = computeLatency(ttl, buffer, payload, ln);
+                            bd = computeBandWidth(ttl, buffer, payload, bd);
                             if (hdrip.saddr == ip->daddr)
                             {
-                                if (ttl == 1)
-                                {
-                                    printf("%d\t%s\t%.3f ms\t%.3f ms\t----- ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
-                                }
-                                else
-                                {
-                                    printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
-                                }
+                                printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f mbps\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, ln, bd);
                             }
                             close(rawfd1);
                             close(rawfd2);
@@ -391,19 +417,9 @@ int main(int argc, char *argv[])
                     else if (hdricmp.type == 11)
                     {
                         // time exceed
-                        raddr_len = sizeof(saddr_raw);
-                        while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
-                            ;
-                        clock_t end_time_laten = clock();
-                        double bd = computeBandWidth(ttl, buffer, payload);
-                        if (ttl == 1)
-                        {
-                            printf("%d\t%s\t%.3f ms\t%.3f ms\t----- ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
-                        }
-                        else
-                        {
-                            printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f ms\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, (float)(end_time_laten - start_time_laten) / CLOCKS_PER_SEC * 1000, bd);
-                        }
+                        ln = computeLatency(ttl, buffer, payload, ln);
+                        bd = computeBandWidth(ttl, buffer, payload, bd);
+                        printf("%d\t%s\t%.3f ms\t%.3f ms\t%.3f mbps\n", ttl, inet_ntoa(saddr_ip), (float)(end_time - start_time) / CLOCKS_PER_SEC * 1000, ln, bd);
                         ttl++;
                         times = 1;
                         timeout = TIMEOUT;
