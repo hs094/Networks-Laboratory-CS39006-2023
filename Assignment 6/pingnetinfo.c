@@ -174,7 +174,6 @@ void print_ICMP(struct iphdr ip, struct icmphdr hdricmp)
     fprintf(fp, "Identifier:     %d\n", ntohs(hdricmp.un.echo.id));
     fprintf(fp, "Sequence Number:%d\n", ntohs(hdricmp.un.echo.sequence));
     fprintf(fp, "------------------------------------------------------------------\n");
-
 }
 clock_t sendICMP(int ttl, char buffer[], char payload[], int sz)
 {
@@ -285,9 +284,9 @@ double computeBandWidth(int ttl, char buffer[], char payload[], double last_bd)
         while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
             ;
         struct iphdr hdrip = *((struct iphdr *)msg);
-                int iphdrlen = sizeof(hdrip);
-                struct icmphdr hdricmp = *((struct icmphdr *)(msg + iphdrlen));
-                print_ICMP(hdrip, hdricmp);
+        int iphdrlen = sizeof(hdrip);
+        struct icmphdr hdricmp = *((struct icmphdr *)(msg + iphdrlen));
+        print_ICMP(hdrip, hdricmp);
         // print_ICMP();
         clock_t end_time1 = clock();
         int len2 = rand() % N + 1;
@@ -332,9 +331,9 @@ double computeLatency(int ttl, char buffer[], char payload[], double last_laten)
         while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
             ;
         struct iphdr hdrip = *((struct iphdr *)msg);
-                int iphdrlen = sizeof(hdrip);
-                struct icmphdr hdricmp = *((struct icmphdr *)(msg + iphdrlen));
-                print_ICMP(hdrip, hdricmp);
+        int iphdrlen = sizeof(hdrip);
+        struct icmphdr hdricmp = *((struct icmphdr *)(msg + iphdrlen));
+        print_ICMP(hdrip, hdricmp);
         // print_ICMP();
         clock_t end_time_laten = clock();
         time += 1000 * (((double)(end_time_laten - start_time_laten)) / CLOCKS_PER_SEC);
