@@ -6,7 +6,7 @@
 
 /* How to RUN:
 $] gcc pingnetinfo.c -o t
-$] sudo ./t www.iitkgp.ac.in 10 3
+$] sudo ./t www.iitkgp.ac.in 1 2
 
 */
 #include <stdio.h>
@@ -292,9 +292,6 @@ double computeLatency(int ttl, char buffer[], char payload[], double last_laten)
         sleep(time_probe);
     }
     time /= probe;
-    // printf("%f %f\n", last_laten, time);
-    // time -= last_laten;
-    // printf("Latency:- %f\n", time);
     return time;
 }
 
@@ -368,7 +365,7 @@ int main(int argc, char *argv[])
         int ret = poll(pollfd_arr, 1, timeout_ms);
         if (ret == -1)
         {
-            perror("select()\n");
+            perror("poll()\n");
             close(rawfd1);
             close(rawfd2);
             exit(EXIT_FAILURE);
