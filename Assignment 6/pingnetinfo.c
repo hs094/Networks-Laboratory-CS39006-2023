@@ -7,8 +7,12 @@
 /* How to RUN:
 $] gcc pingnetinfo.c -o t
 $] sudo ./t www.iitkgp.ac.in 1 2
-
 */
+
+/*
+    The Output for the Header Information will be printed in the file with name "output_file"
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -53,6 +57,8 @@ u_int16_t src_port, dst_port;
 u_int32_t dst_addr;
 struct iphdr *ip;
 struct udphdr *udp;
+char *output_file = "output.txt";
+FILE *fp;
 
 void print_Usage_Error(char *name)
 {
@@ -143,6 +149,33 @@ void form_socket(char s[])
         }
     }
 }
+void print_ICMP(struct iphdr ip, struct icmphdr hdricmp)
+{
+    // IP Header
+    fprintf(fp, "------------------------------------------------------------------\n");
+    fprintf(fp, "IP Header\n");
+    fprintf(fp, "---------\n");
+    fprintf(fp, "Version:        %d\n", ip.version);
+    fprintf(fp, "Header Length:  %d bytes\n", ip.ihl * 4);
+    fprintf(fp, "Type of Service:%d\n", ip.tos);
+    fprintf(fp, "Total Length:   %d bytes\n", ntohs(ip.tot_len));
+    fprintf(fp, "Identification: %d\n", ntohs(ip.id));
+    fprintf(fp, "Time To Live:   %d\n", ip.ttl);
+    fprintf(fp, "Protocol:       %d\n", ip.protocol);
+    fprintf(fp, "Source Address: %s\n", inet_ntoa(*(struct in_addr *)&ip.saddr));
+    fprintf(fp, "Destination Address: %s\n", inet_ntoa(*(struct in_addr *)&ip.daddr));
+    fprintf(fp, "Checksum:       %d\n", ntohs(ip.check));
+    // ICMP Header
+    fprintf(fp, "\nICMP Header\n");
+    fprintf(fp, "-----------\n");
+    fprintf(fp, "Type:           %d\n", hdricmp.type);
+    fprintf(fp, "Code:           %d\n", hdricmp.code);
+    fprintf(fp, "Checksum:       %d\n", ntohs(hdricmp.checksum));
+    fprintf(fp, "Identifier:     %d\n", ntohs(hdricmp.un.echo.id));
+    fprintf(fp, "Sequence Number:%d\n", ntohs(hdricmp.un.echo.sequence));
+    fprintf(fp, "------------------------------------------------------------------\n");
+
+}
 clock_t sendICMP(int ttl, char buffer[], char payload[], int sz)
 {
     /* 5. Generate UPD and IP header */
@@ -155,16 +188,13 @@ clock_t sendICMP(int ttl, char buffer[], char payload[], int sz)
     ip->protocol = 17; // UDP
     ip->saddr = 0;     // src_addr;
     ip->daddr = dst_addr;
-
+    // calculate the checksum for integrity
+    ip->check = csum((unsigned short *)buffer, sizeof(struct iphdr) + sizeof(struct udphdr));
     // fabricate the UDP header
     udp->source = htons(src_port);
     // destination port number
     udp->dest = htons(dst_port);
     udp->len = htons(sizeof(struct udphdr) + N);
-
-    // calculate the checksum for integrity
-    ip->check = csum((unsigned short *)buffer, sizeof(struct iphdr) + sizeof(struct udphdr));
-
     /* 6. Send the packet */
     strcpy(buffer + sizeof(struct iphdr) + sizeof(struct udphdr), payload);
     if (sendto(rawfd1, buffer, ip->tot_len, 0, (struct sockaddr *)&cli_addr, sizeof(cli_addr)) < 0)
@@ -172,6 +202,7 @@ clock_t sendICMP(int ttl, char buffer[], char payload[], int sz)
         perror("sendto()");
         close(rawfd1);
         close(rawfd2);
+        fclose(fp);
         exit(EXIT_FAILURE);
     }
     return clock();
@@ -194,6 +225,7 @@ void networkICMP(char *argv[])
     {
         close(rawfd1);
         close(rawfd2);
+        fclose(fp);
         exit(EXIT_FAILURE);
     }
 
@@ -210,7 +242,8 @@ void networkICMP(char *argv[])
         perror("raw bind");
         close(rawfd1);
         close(rawfd2);
-        exit(1);
+        fclose(fp);
+        exit(EXIT_FAILURE);
     }
 
     cli_addr.sin_family = AF_INET;
@@ -224,6 +257,7 @@ void networkICMP(char *argv[])
         fprintf(stderr, "Error: setsockopt. You need to run this program as root\n");
         close(rawfd1);
         close(rawfd2);
+        fclose(fp);
         exit(EXIT_FAILURE);
     }
 }
@@ -250,6 +284,11 @@ double computeBandWidth(int ttl, char buffer[], char payload[], double last_bd)
         socklen_t raddr_len = sizeof(saddr_raw);
         while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
             ;
+        struct iphdr hdrip = *((struct iphdr *)msg);
+                int iphdrlen = sizeof(hdrip);
+                struct icmphdr hdricmp = *((struct icmphdr *)(msg + iphdrlen));
+                print_ICMP(hdrip, hdricmp);
+        // print_ICMP();
         clock_t end_time1 = clock();
         int len2 = rand() % N + 1;
         memset(payload, 0, N);
@@ -260,6 +299,11 @@ double computeBandWidth(int ttl, char buffer[], char payload[], double last_bd)
         raddr_len = sizeof(saddr_raw);
         while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
             ;
+        // print_ICMP();
+        struct iphdr hdrip1 = *((struct iphdr *)msg);
+        int iphdrlen1 = sizeof(hdrip);
+        struct icmphdr hdricmp1 = *((struct icmphdr *)(msg + iphdrlen));
+        print_ICMP(hdrip1, hdricmp1);
         clock_t end_time2 = clock();
         double val1 = 1000.0 * ((double)(end_time1 - start_time1) / (double)CLOCKS_PER_SEC);
         double val2 = 1000.0 * ((double)(end_time2 - start_time2) / (double)CLOCKS_PER_SEC);
@@ -287,6 +331,11 @@ double computeLatency(int ttl, char buffer[], char payload[], double last_laten)
         raddr_len = sizeof(saddr_raw);
         while ((msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len)) <= 0)
             ;
+        struct iphdr hdrip = *((struct iphdr *)msg);
+                int iphdrlen = sizeof(hdrip);
+                struct icmphdr hdricmp = *((struct icmphdr *)(msg + iphdrlen));
+                print_ICMP(hdrip, hdricmp);
+        // print_ICMP();
         clock_t end_time_laten = clock();
         time += 1000 * (((double)(end_time_laten - start_time_laten)) / CLOCKS_PER_SEC);
         sleep(time_probe);
@@ -298,6 +347,14 @@ double computeLatency(int ttl, char buffer[], char payload[], double last_laten)
 int main(int argc, char *argv[])
 {
     srand(100);
+    // open the output file in write mode
+    fp = fopen(output_file, "w");
+
+    if (fp == NULL)
+    {
+        printf("Error opening file!\n");
+        return 1;
+    }
     int *p = (int *)malloc(sizeof(int *));
     if (argc != 4)
     {
@@ -368,6 +425,7 @@ int main(int argc, char *argv[])
             perror("poll()\n");
             close(rawfd1);
             close(rawfd2);
+            fclose(fp);
             exit(EXIT_FAILURE);
         }
         else if (ret)
@@ -380,6 +438,10 @@ int main(int argc, char *argv[])
                 int msglen;
                 socklen_t raddr_len = sizeof(saddr_raw);
                 msglen = recvfrom(rawfd2, msg, MSG_SIZE, 0, (struct sockaddr *)&saddr_raw, &raddr_len);
+                struct iphdr hdrip = *((struct iphdr *)msg);
+                int iphdrlen = sizeof(hdrip);
+                struct icmphdr hdricmp = *((struct icmphdr *)(msg + iphdrlen));
+                print_ICMP(hdrip, hdricmp);
                 clock_t end_time = clock();
                 if (msglen <= 0)
                 {
@@ -387,9 +449,10 @@ int main(int argc, char *argv[])
                     is_send = 1;
                     continue;
                 }
-                struct iphdr hdrip = *((struct iphdr *)msg);
-                int iphdrlen = sizeof(hdrip);
-                struct icmphdr hdricmp = *((struct icmphdr *)(msg + iphdrlen));
+                struct iphdr hdrip1 = *((struct iphdr *)msg);
+                int iphdrlen1 = sizeof(hdrip);
+                struct icmphdr hdricmp1 = *((struct icmphdr *)(msg + iphdrlen));
+                print_ICMP(hdrip1, hdricmp1);
                 /* 9. Handle Different Case */
                 // read the destination IP
                 struct in_addr saddr_ip;
@@ -409,6 +472,7 @@ int main(int argc, char *argv[])
                             }
                             close(rawfd1);
                             close(rawfd2);
+                            fclose(fp);
                             exit(EXIT_SUCCESS);
                         }
                     }
@@ -468,5 +532,6 @@ int main(int argc, char *argv[])
     }
     close(rawfd1);
     close(rawfd2);
+    fclose(fp);
     exit(EXIT_SUCCESS);
 }
