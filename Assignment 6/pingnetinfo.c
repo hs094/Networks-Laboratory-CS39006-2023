@@ -161,7 +161,26 @@ void print_ICMP(struct iphdr ip, struct icmphdr hdricmp)
     fprintf(fp, "Total Length:   %d bytes\n", ntohs(ip.tot_len));
     fprintf(fp, "Identification: %d\n", ntohs(ip.id));
     fprintf(fp, "Time To Live:   %d\n", ip.ttl);
-    fprintf(fp, "Protocol:       %d\n", ip.protocol);
+    if (ip.protocol == IPPROTO_TCP)
+    {
+        // Handle TCP packet
+        fprintf(fp, "Protocol:       TCP\n");
+    }
+    else if (ip.protocol == IPPROTO_UDP)
+    {
+        // Handle UDP packet
+        fprintf(fp, "Protocol:       UDP\n");
+    }
+    else if (ip.protocol == IPPROTO_ICMP)
+    {
+        // Handle ICMP packet
+        fprintf(fp, "Protocol:       ICMP\n");
+    }
+    else
+    {
+        // Handle other protocol types, or ignore the packet
+        fprintf(fp, "Protocol:       Unknown Protocol\n");
+    }
     fprintf(fp, "Source Address: %s\n", inet_ntoa(*(struct in_addr *)&ip.saddr));
     fprintf(fp, "Destination Address: %s\n", inet_ntoa(*(struct in_addr *)&ip.daddr));
     fprintf(fp, "Checksum:       %d\n", ntohs(ip.check));
