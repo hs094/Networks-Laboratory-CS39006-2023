@@ -27,6 +27,7 @@ $] sudo ./t www.iitkgp.ac.in 10 3
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
+#include <poll.h>
 
 #define ERROR(msg, ...) printf("\033[1;31m[ERROR] " msg " \033[0m\n", ##__VA_ARGS__);
 #define SUCCESS(msg, ...) printf("\033[1;36m[PING] " msg " \033[0m\n", ##__VA_ARGS__);
@@ -267,7 +268,6 @@ double computeBandWidth(int ttl, char buffer[], char payload[], double last_bd)
         sleep(time_probe);
     }
     time /= probe;
-    time -= probe;
     return time;
 }
 double computeLatency(int ttl, char buffer[], char payload[], double last_laten)
@@ -357,8 +357,15 @@ int main(int argc, char *argv[])
         /* 7. Wait on select call */
         FD_ZERO(&readSockSet);
         FD_SET(rawfd2, &readSockSet);
-        struct timeval tv = {timeout, 0};
-        int ret = select(rawfd2 + 1, &readSockSet, 0, 0, &tv);
+        // Declare and initialize the pollfd structure
+        struct pollfd pollfd_arr[2];
+        pollfd_arr[0].fd = rawfd2;
+        pollfd_arr[0].events = POLLIN;
+
+        // Set the timeout value in milliseconds
+        int timeout_ms = timeout * 1000;
+        // Wait for I/O activity using poll()
+        int ret = poll(pollfd_arr, 1, timeout_ms);
         if (ret == -1)
         {
             perror("select()\n");
@@ -392,15 +399,9 @@ int main(int argc, char *argv[])
                 saddr_ip.s_addr = hdrip.saddr;
                 if (hdrip.protocol == 1) // ICMP
                 {
-                    // Sending for Latency a Message of Size Zero
-                    // memset(payload, 0, N);
-                    // memset(buffer, 0, PCKT_LEN);
-                    // sendICMP(ttl, buffer, payload, 0);
-                    // clock_t start_time_laten = clock();
                     if (hdricmp.type == 3)
                     {
                         // verify
-                        // Calculating Latency
                         if (FD_ISSET(rawfd2, &readSockSet))
                         {
                             ln = computeLatency(ttl, buffer, payload, ln);

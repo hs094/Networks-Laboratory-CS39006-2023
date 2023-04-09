@@ -1,3 +1,1 @@
 1. Remove UDP Socket
-2. Complete Latency and Bandwidth
-3. Convert Select Call to Poll
