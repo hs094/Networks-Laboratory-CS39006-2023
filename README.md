@@ -11,9 +11,10 @@ Computer Networks Laboratory (Spring 2023) course assignments and implementation
 ## Table of Contents
 - [Assignment 1: Time Synchronization](#assignment-1)
 - [Assignment 2: Socket Programming](#assignment-2)
-- [Assignment 3: HTTP Server-Client](#assignment-3)
-- [Assignment 4: Network Monitoring](#assignment-4)
-- [Assignment 5: Similarity Detection](#assignment-5)
+- [Assignment 3: Simple Chat Client-Server](#assignment-3)
+- [Assignment 4: File Transfer Using Sockets](#assignment-4)
+- [Assignment 5: Message Oriented TCP](#assignment-5)
+- [Assignment 6: Raw Sockets](#assignment-6)
 
 ## Assignment Details
 
